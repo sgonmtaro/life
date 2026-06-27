@@ -198,7 +198,12 @@ tr:nth-child(even) td{background:#fafbfd;}
       <span class="hint" id="f-sub-hint" style="display:none">「補助科目」タブで追加できます</span>
     </div>
     <div class="field"><label>口座</label>
-      <select id="f-account"><option>現金</option><option>銀行口座</option><option>クレジットカード</option><option>電子マネー</option></select>
+      <select id="f-account" onchange="onAccountChange()"><option>現金</option><option>銀行口座</option><option>クレジットカード</option><option>電子マネー</option></select>
+    </div>
+    <div class="field">
+      <label>口座補助科目 <span style="color:#aaa;font-weight:400">（任意）</span></label>
+      <select id="f-account-sub"></select>
+      <span class="hint" id="f-account-sub-hint" style="display:none">「補助科目」タブの口座欄で追加できます</span>
     </div>
     <div class="field"><label>摘要</label><input type="text" id="f-desc" placeholder="例：スーパー買い物"></div>
     <div class="field"><label>金額（円）</label><input type="number" id="f-amount" placeholder="0" min="0" inputmode="numeric"></div>
@@ -272,6 +277,13 @@ const DEFAULT_SUBS = {
   "副業":["フリーランス","投資配当"]
 };
 
+const DEFAULT_ACCOUNT_SUBS = {
+  "現金":            ["財布","小口"],
+  "銀行口座":        ["楽天銀行","三菱UFJ","ゆうちょ"],
+  "クレジットカード":["楽天カード","三井住友カード"],
+  "電子マネー":      ["Suica","PayPay","nanaco"],
+};
+
 const DEFAULT_ENTRIES = [
   {id:1,date:"2026-06-01",type:"income", category:"給与",  sub:"本給",              account:"銀行口座",       description:"6月分給与",      amount:280000},
   {id:2,date:"2026-06-03",type:"expense",category:"食費",  sub:"自炊・食材",        account:"現金",           description:"スーパー買い物", amount:4200},
@@ -297,6 +309,7 @@ function load(key,def){try{const v=localStorage.getItem(key);return v?JSON.parse
 function save(key,val){try{localStorage.setItem(key,JSON.stringify(val));}catch(e){}}
 
 let entries      = load('kk_entries', DEFAULT_ENTRIES);
+let accountSubMap= load('kk_account_subs', DEFAULT_ACCOUNT_SUBS);
 let subMap       = load('kk_subs',    DEFAULT_SUBS);
 let openingBal   = load('kk_opening', DEFAULT_OPENING);
 let funds        = load('kk_funds',   DEFAULT_FUNDS);
@@ -327,13 +340,16 @@ function switchTab(btn){
 function getFiltered(){return entries.filter(e=>e.date.startsWith(currentMonth)).sort((a,b)=>a.date.localeCompare(b.date));}
 
 // 口座残高計算（全期間）
+function accKey(account, accountSub){ return accountSub ? account+'|'+accountSub : account; }
 function calcAccountBalances(){
   const bal={};
-  ACCOUNTS.forEach(a=>bal[a]=openingBal[a]||0);
+  // seed from opening balances
+  Object.entries(openingBal).forEach(([k,v])=>bal[k]=v);
   entries.forEach(e=>{
-    if(!bal[e.account]&&bal[e.account]!==0)bal[e.account]=0;
-    if(e.type==='income')  bal[e.account]+=e.amount;
-    else                   bal[e.account]-=e.amount;
+    const k=accKey(e.account, e.accountSub);
+    if(bal[k]==null) bal[k]=0;
+    if(e.type==='income') bal[k]+=e.amount;
+    else                  bal[k]-=e.amount;
   });
   return bal;
 }
@@ -384,7 +400,7 @@ function renderLedger(filtered){
       <td><span class="badge badge-${e.type}">${e.type==='income'?'収入':'支出'}</span></td>
       <td><b>${esc(e.category)}</b>${subHtml}</td>
       <td style="color:#555;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(e.description)}</td>
-      <td class="col-account" style="text-align:right;color:#666;font-size:11px">${esc(e.account)}</td>
+      <td class="col-account" style="text-align:right;color:#666;font-size:11px">${esc(e.account)}${e.accountSub?` <span style='color:var(--blue)'>› ${esc(e.accountSub)}</span>`:''}</td>
       <td style="text-align:right" class="${e.type==='income'?'amt-income':'amt-expense'}">${e.type==='income'?'+':'−'}¥${fmt(e.amount)}</td>
       <td style="text-align:right;white-space:nowrap">
         <button class="btn-edit" onclick="openEditModal(${e.id})">編集</button>
@@ -464,18 +480,37 @@ function renderTrial(){
   const allInc=entries.filter(e=>e.type==='income').reduce((s,e)=>s+e.amount,0);
   const allExp=entries.filter(e=>e.type==='expense').reduce((s,e)=>s+e.amount,0);
 
-  // 口座別残高表
+  // 口座別残高表（補助科目対応）
+  const accBal2=calcAccountBalances();
   const rows=ACCOUNTS.map(a=>{
+    const subs2=accountSubMap[a]||[];
     const op=openingBal[a]||0;
-    const inc=entries.filter(e=>e.account===a&&e.type==='income').reduce((s,e)=>s+e.amount,0);
-    const exp=entries.filter(e=>e.account===a&&e.type==='expense').reduce((s,e)=>s+e.amount,0);
-    const bal=op+inc-exp;
-    return`<div class="trial-row">
-      <div>${esc(a)}</div>
+    const inc=entries.filter(e=>e.account===a&&!e.accountSub&&e.type==='income').reduce((s,e)=>s+e.amount,0);
+    const exp=entries.filter(e=>e.account===a&&!e.accountSub&&e.type==='expense').reduce((s,e)=>s+e.amount,0);
+    const bal=accBal2[a]!=null?accBal2[a]:(op+inc-exp);
+    // main row
+    let html=`<div class="trial-row" style="background:#f9f9fb">
+      <div style="font-weight:700">${esc(a)}</div>
       <div style="color:#555">¥${fmt(op)}</div>
-      <div>${inc?`<span class="amt-income">+¥${fmt(inc)}</span>`:'-'}</div>
+      <div>${(inc-exp)>=0?`<span class='amt-income'>+¥${fmt(inc-exp)}</span>`:`<span class='amt-expense'>−¥${fmt(exp-inc)}</span>`}</div>
       <div class="${bal>=0?'amt-income':'amt-expense'}">¥${fmt(bal)}</div>
     </div>`;
+    // sub rows
+    subs2.forEach(sub=>{
+      const si=entries.filter(e=>e.account===a&&e.accountSub===sub&&e.type==='income').reduce((s,e)=>s+e.amount,0);
+      const se=entries.filter(e=>e.account===a&&e.accountSub===sub&&e.type==='expense').reduce((s,e)=>s+e.amount,0);
+      if(!si&&!se)return;
+      const sk=a+'|'+sub;
+      const sop=openingBal[sk]||0;
+      const sb=sop+si-se;
+      html+=`<div class="trial-row" style="font-size:12px">
+        <div style="padding-left:22px;color:var(--blue)">› ${esc(sub)}</div>
+        <div style="color:#aaa">${sop?'¥'+fmt(sop):'-'}</div>
+        <div>${(si-se)>=0?`<span class='amt-income'>+¥${fmt(si-se)}</span>`:`<span class='amt-expense'>−¥${fmt(se-si)}</span>`}</div>
+        <div class="${sb>=0?'amt-income':'amt-expense'}">¥${fmt(sb)}</div>
+      </div>`;
+    });
+    return html;
   }).join('');
 
   // 月次推移グラフ
@@ -588,9 +623,20 @@ function renderSettings(){
     }).join('');
     return`<div class="settings-type-header" style="background:${bg};color:${color}">${label}</div>${rows}`;
   }).join('');
+  // 口座セクション
+  const accRows=ACCOUNTS.map(a=>{
+    const subs4=accountSubMap[a]||[];
+    const tags4=subs4.map(s=>`<span class="sub-tag">${esc(s)}<button onclick="quickDeleteAccountSub('${esc(a)}','${esc(s)}')">×</button></span>`).join('');
+    return`<div class="settings-cat-row">
+      <div class="settings-cat-name">${esc(a)}</div>
+      <div class="settings-tags">${tags4}${subs4.length===0?'<span class="no-sub">補助なし</span>':''}</div>
+      <button class="btn-add-sub" onclick="openAccountSubModal('${esc(a)}')">＋ 追加</button>
+    </div>`;
+  }).join('');
+  const accSection=`<div class="settings-type-header" style="background:#f0f0ff;color:#3a3ab0">▶ 口座</div>${accRows}`;
   return`<div class="settings-block">
     <div class="settings-header">補助科目マスタ設定 <span style="font-weight:400;font-size:11px;color:#888;margin-left:6px">自由に追加・削除できます</span></div>
-    ${html}</div>`;
+    ${accSection}${html}</div>`;
 }
 
 // ===================== ENTRY MODAL =====================
@@ -606,6 +652,7 @@ function openEntryModal(id=null){
   document.getElementById('f-amount').value  =e?.amount||'';
   populateCategorySelect(e?.type||'expense',e?.category);
   populateSubSelect(e?.category||(CATEGORIES[e?.type||'expense'][0]),e?.sub);
+  populateAccountSubSelect(e?.account||'現金',e?.accountSub);
   document.getElementById('entry-modal').style.display='flex';
 }
 function openEditModal(id){openEntryModal(id);}
@@ -618,12 +665,18 @@ function populateSubSelect(cat,sel){
   document.getElementById('f-sub').innerHTML=`<option value="">— 選択しない —</option>`+subs.map(s=>`<option${s===sel?' selected':''}>${esc(s)}</option>`).join('');
   document.getElementById('f-sub-hint').style.display=subs.length===0?'block':'none';
 }
+function populateAccountSubSelect(account, sel){
+  const subs = accountSubMap[account]||[];
+  document.getElementById('f-account-sub').innerHTML = '<option value="">— 選択しない —</option>'+subs.map(s=>`<option${s===sel?' selected':''}>${esc(s)}</option>`).join('');
+  document.getElementById('f-account-sub-hint').style.display = subs.length===0?'block':'none';
+}
+function onAccountChange(){populateAccountSubSelect(document.getElementById('f-account').value, null);}
 function onTypeChange(){const t=document.getElementById('f-type').value;populateCategorySelect(t,null);populateSubSelect(CATEGORIES[t][0],null);}
 function onCategoryChange(){populateSubSelect(document.getElementById('f-category').value,null);}
 function saveEntry(){
   const amount=Number(document.getElementById('f-amount').value);
   if(!amount||isNaN(amount)){alert('金額を入力してください');return;}
-  const entry={id:editingId||Date.now(),date:document.getElementById('f-date').value,type:document.getElementById('f-type').value,category:document.getElementById('f-category').value,sub:document.getElementById('f-sub').value,account:document.getElementById('f-account').value,description:document.getElementById('f-desc').value,amount};
+  const entry={id:editingId||Date.now(),date:document.getElementById('f-date').value,type:document.getElementById('f-type').value,category:document.getElementById('f-category').value,sub:document.getElementById('f-sub').value,account:document.getElementById('f-account').value,accountSub:document.getElementById('f-account-sub').value,description:document.getElementById('f-desc').value,amount};
   if(editingId)entries=entries.map(e=>e.id===editingId?entry:e);else entries.push(entry);
   save('kk_entries',entries);closeEntryModal();render();
 }
@@ -631,33 +684,53 @@ function deleteEntry(id){if(!confirm('この仕訳を削除しますか？'))ret
 
 // ===================== SUB MODAL =====================
 function openSubModal(cat){
+  accountSubModalTarget=null;
   subModalCat=cat;
   document.getElementById('sub-modal-title').textContent=`「${cat}」の補助科目`;
   document.getElementById('new-sub-input').value='';
   renderSubList();
   document.getElementById('sub-modal').style.display='flex';
 }
-function closeSubModal(){document.getElementById('sub-modal').style.display='none';render();}
+function closeSubModal(){document.getElementById('sub-modal').style.display='none';accountSubModalTarget=null;subModalCat=null;render();}
 function renderSubList(){
   const subs=subMap[subModalCat]||[];
   document.getElementById('sub-list').innerHTML=subs.length?subs.map(s=>`<div class="sub-list-item"><span>${esc(s)}</span><button onclick="removeSub('${esc(s)}')">×</button></div>`).join(''):'<div style="color:#bbb;font-size:13px">まだ補助科目がありません</div>';
 }
-function addSub(){const name=document.getElementById('new-sub-input').value.trim();if(!name||(subMap[subModalCat]||[]).includes(name))return;subMap[subModalCat]=[...(subMap[subModalCat]||[]),name];save('kk_subs',subMap);document.getElementById('new-sub-input').value='';renderSubList();}
+function addSub(){
+  if(accountSubModalTarget&&!subModalCat){addAccountSub();return;}
+  const name=document.getElementById('new-sub-input').value.trim();
+  if(!name||(subMap[subModalCat]||[]).includes(name))return;
+  subMap[subModalCat]=[...(subMap[subModalCat]||[]),name];
+  save('kk_subs',subMap);document.getElementById('new-sub-input').value='';renderSubList();
+}
 function removeSub(sub){subMap[subModalCat]=(subMap[subModalCat]||[]).filter(s=>s!==sub);save('kk_subs',subMap);renderSubList();}
 function quickDeleteSub(cat,sub){subMap[cat]=(subMap[cat]||[]).filter(s=>s!==sub);save('kk_subs',subMap);render();}
 
 // ===================== OPENING BALANCE MODAL =====================
 function openOpeningModal(){
   const fields=document.getElementById('opening-fields');
-  fields.innerHTML=ACCOUNTS.map(a=>`
-    <div class="field"><label>${esc(a)}</label>
-      <input type="number" id="op-${a}" value="${openingBal[a]||0}" min="0" inputmode="numeric">
-    </div>`).join('');
+  fields.innerHTML=ACCOUNTS.map(a=>{
+    const subs3=accountSubMap[a]||[];
+    const subFields=subs3.map(s=>`
+      <div class="field"><label style="padding-left:12px;color:var(--blue)">› ${esc(s)}</label>
+        <input type="number" id="op-${esc(a+'|'+s)}" value="${openingBal[a+'|'+s]||0}" min="0" inputmode="numeric">
+      </div>`).join('');
+    return`<div class="field"><label style="font-weight:700">${esc(a)}</label>
+      <input type="number" id="op-${esc(a)}" value="${openingBal[a]||0}" min="0" inputmode="numeric">
+    </div>${subFields}`;
+  }).join('');
   document.getElementById('opening-modal').style.display='flex';
 }
 function closeOpeningModal(){document.getElementById('opening-modal').style.display='none';}
 function saveOpeningBalances(){
-  ACCOUNTS.forEach(a=>{openingBal[a]=Number(document.getElementById(`op-${a}`).value)||0;});
+  ACCOUNTS.forEach(a=>{
+    openingBal[a]=Number(document.getElementById('op-'+a)?.value)||0;
+    (accountSubMap[a]||[]).forEach(s=>{
+      const k=a+'|'+s;
+      const el=document.getElementById('op-'+k);
+      if(el) openingBal[k]=Number(el.value)||0;
+    });
+  });
   save('kk_opening',openingBal);closeOpeningModal();render();
 }
 
@@ -698,6 +771,39 @@ function saveFund(){
   save('kk_funds',funds);closeFundModal();render();
 }
 function deleteFund(id){if(!confirm('このファンドを削除しますか？'))return;funds=funds.filter(f=>f.id!==id);save('kk_funds',funds);render();}
+
+// ===================== ACCOUNT SUB MODAL =====================
+let accountSubModalTarget=null;
+function openAccountSubModal(account){
+  subModalCat=null;
+  accountSubModalTarget=account;
+  document.getElementById('sub-modal-title').textContent=`「${account}」の口座補助科目`;
+  document.getElementById('new-sub-input').value='';
+  renderAccountSubList();
+  document.getElementById('sub-modal').style.display='flex';
+}
+function renderAccountSubList(){
+  const subs=accountSubMap[accountSubModalTarget]||[];
+  document.getElementById('sub-list').innerHTML=subs.length
+    ?subs.map(s=>`<div class="sub-list-item"><span>${esc(s)}</span><button onclick="removeAccountSub('${esc(s)}')">×</button></div>`).join('')
+    :'<div style="color:#bbb;font-size:13px">まだ補助科目がありません</div>';
+}
+function addAccountSub(){
+  const name=document.getElementById('new-sub-input').value.trim();
+  if(!name||(accountSubMap[accountSubModalTarget]||[]).includes(name))return;
+  accountSubMap[accountSubModalTarget]=[...(accountSubMap[accountSubModalTarget]||[]),name];
+  save('kk_account_subs',accountSubMap);
+  document.getElementById('new-sub-input').value='';
+  renderAccountSubList();
+}
+function removeAccountSub(sub){
+  accountSubMap[accountSubModalTarget]=(accountSubMap[accountSubModalTarget]||[]).filter(s=>s!==sub);
+  save('kk_account_subs',accountSubMap);renderAccountSubList();
+}
+function quickDeleteAccountSub(account,sub){
+  accountSubMap[account]=(accountSubMap[account]||[]).filter(s=>s!==sub);
+  save('kk_account_subs',accountSubMap);render();
+}
 
 // ===================== UTILS =====================
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
