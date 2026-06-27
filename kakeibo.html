@@ -146,7 +146,29 @@ tr:nth-child(even) td{background:#fafbfd;}
 .btn-close{margin-top:16px;width:100%;padding:12px;border:1px solid var(--border);border-radius:10px;background:var(--white);font-weight:600;font-size:15px;cursor:pointer;color:#555;}
 .section-title{font-weight:700;font-size:13px;color:var(--navy);margin:14px 0 8px;padding-left:2px;}
 .empty{text-align:center;padding:48px 16px;color:#bbb;font-size:14px;}
+/* SEARCH DROPDOWN */
+.search-wrap{position:relative;}
+.search-input{width:100%;padding:11px 12px;border:1px solid var(--border);border-radius:8px;font-size:15px;background:#fafbfc;color:var(--text);}
+.search-input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(74,144,217,0.15);}
+.search-dropdown{position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid var(--border);border-top:none;border-radius:0 0 8px 8px;box-shadow:0 4px 16px rgba(0,0,0,0.12);z-index:300;max-height:200px;overflow-y:auto;display:none;}
+.search-dropdown.open{display:block;}
+.search-opt{padding:10px 14px;cursor:pointer;font-size:14px;border-bottom:1px solid #f0f0f0;display:flex;align-items:center;gap:6px;}
+.search-opt:last-child{border-bottom:none;}
+.search-opt:hover,.search-opt.focused{background:#eef4fc;color:var(--navy);}
+.search-opt .match-highlight{color:var(--blue);font-weight:700;}
+.search-opt .opt-sub{font-size:11px;color:#999;margin-left:auto;}
+
 @media(max-width:500px){.col-account{display:none;}}
+/* CATEGORY MANAGEMENT */
+.cat-manage-row{display:flex;align-items:center;gap:8px;padding:8px 16px;border-bottom:1px solid #f2f2f2;}
+.cat-manage-name{flex:1;font-size:13px;font-weight:600;}
+.cat-manage-name input{width:100%;padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:13px;}
+.btn-icon{border:none;background:none;cursor:pointer;padding:4px 6px;border-radius:5px;font-size:15px;transition:background 0.1s;}
+.btn-icon:hover{background:#f0f0f0;}
+.btn-icon.danger:hover{background:#fceaea;}
+.add-cat-row{display:flex;gap:8px;padding:10px 16px;}
+.add-cat-row input{flex:1;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;}
+
 </style>
 </head>
 <body>
@@ -191,18 +213,40 @@ tr:nth-child(even) td{background:#fafbfd;}
         <option value="income">収入</option><option value="expense">支出</option>
       </select>
     </div>
-    <div class="field"><label>勘定科目</label><select id="f-category" onchange="onCategoryChange()"></select></div>
+    <div class="field"><label>勘定科目</label>
+      <div class="search-wrap">
+        <input type="text" class="search-input" id="f-category-input" placeholder="例: food / 食費 / しょく" autocomplete="off"
+          oninput="filterSearch('category')" onkeydown="searchKeydown(event,'category')" onfocus="openSearch('category')" onblur="delayClose('category')">
+        <div class="search-dropdown" id="f-category-drop"></div>
+        <input type="hidden" id="f-category">
+      </div>
+    </div>
     <div class="field">
       <label>補助科目 <span style="color:#aaa;font-weight:400">（任意）</span></label>
-      <select id="f-sub"></select>
-      <span class="hint" id="f-sub-hint" style="display:none">「補助科目」タブで追加できます</span>
+      <div class="search-wrap">
+        <input type="text" class="search-input" id="f-sub-input" placeholder="例: gaishoku / 外食（任意）" autocomplete="off"
+          oninput="filterSearch('sub')" onkeydown="searchKeydown(event,'sub')" onfocus="openSearch('sub')" onblur="delayClose('sub')">
+        <div class="search-dropdown" id="f-sub-drop"></div>
+        <input type="hidden" id="f-sub">
+      </div>
+      <span class="hint" id="f-sub-hint" style="display:none">「補助科目」タブで補助科目を追加できます</span>
     </div>
     <div class="field"><label>口座</label>
-      <select id="f-account" onchange="onAccountChange()"><option>現金</option><option>銀行口座</option><option>クレジットカード</option><option>電子マネー</option></select>
+      <div class="search-wrap">
+        <input type="text" class="search-input" id="f-account-input" placeholder="例: genkin / 現金 / rakuten" autocomplete="off"
+          oninput="filterSearch('account')" onkeydown="searchKeydown(event,'account')" onfocus="openSearch('account')" onblur="delayClose('account')">
+        <div class="search-dropdown" id="f-account-drop"></div>
+        <input type="hidden" id="f-account">
+      </div>
     </div>
     <div class="field">
       <label>口座補助科目 <span style="color:#aaa;font-weight:400">（任意）</span></label>
-      <select id="f-account-sub"></select>
+      <div class="search-wrap">
+        <input type="text" class="search-input" id="f-account-sub-input" placeholder="例: suica / Suica（任意）" autocomplete="off"
+          oninput="filterSearch('accountSub')" onkeydown="searchKeydown(event,'accountSub')" onfocus="openSearch('accountSub')" onblur="delayClose('accountSub')">
+        <div class="search-dropdown" id="f-account-sub-drop"></div>
+        <input type="hidden" id="f-account-sub">
+      </div>
       <span class="hint" id="f-account-sub-hint" style="display:none">「補助科目」タブの口座欄で追加できます</span>
     </div>
     <div class="field"><label>摘要</label><input type="text" id="f-desc" placeholder="例：スーパー買い物"></div>
@@ -259,7 +303,7 @@ tr:nth-child(even) td{background:#fafbfd;}
 
 <script>
 // ===================== CONSTANTS =====================
-const CATEGORIES = {
+const DEFAULT_CATEGORIES = {
   income:  ["給与","副業","賞与","利息","その他収入"],
   expense: ["食費","住居費","光熱費","通信費","交通費","医療費","教育費","娯楽費","衣料費","日用品","保険料","その他支出"]
 };
@@ -309,6 +353,7 @@ function load(key,def){try{const v=localStorage.getItem(key);return v?JSON.parse
 function save(key,val){try{localStorage.setItem(key,JSON.stringify(val));}catch(e){}}
 
 let entries      = load('kk_entries', DEFAULT_ENTRIES);
+let CATEGORIES   = load('kk_categories', DEFAULT_CATEGORIES);
 let accountSubMap= load('kk_account_subs', DEFAULT_ACCOUNT_SUBS);
 let subMap       = load('kk_subs',    DEFAULT_SUBS);
 let openingBal   = load('kk_opening', DEFAULT_OPENING);
@@ -612,16 +657,32 @@ function renderSettings(){
     {type:'expense',label:'▶ 支出科目',bg:'#fdf0f0',color:'#b93030'},
   ];
   const html=types.map(({type,label,bg,color})=>{
-    const rows=CATEGORIES[type].map(cat=>{
+    // category management rows
+    const catRows=CATEGORIES[type].map((cat,idx)=>{
       const subs=subMap[cat]||[];
       const tags=subs.map(s=>`<span class="sub-tag">${esc(s)}<button onclick="quickDeleteSub('${esc(cat)}','${esc(s)}')">×</button></span>`).join('');
-      return`<div class="settings-cat-row">
-        <div class="settings-cat-name">${esc(cat)}</div>
-        <div class="settings-tags">${tags}${subs.length===0?'<span class="no-sub">補助科目なし</span>':''}</div>
-        <button class="btn-add-sub" onclick="openSubModal('${esc(cat)}')">＋ 追加</button>
+      return`<div class="settings-cat-row" style="flex-direction:column;align-items:stretch;gap:6px">
+        <div style="display:flex;align-items:center;gap:6px">
+          <div style="display:flex;flex-direction:column;gap:2px;margin-right:2px">
+            <button class="btn-icon" onclick="moveCat('${esc(type)}',${idx},-1)" ${idx===0?'style="opacity:0.25;pointer-events:none"':''}>▲</button>
+            <button class="btn-icon" onclick="moveCat('${esc(type)}',${idx},1)"  ${idx===CATEGORIES[type].length-1?'style="opacity:0.25;pointer-events:none"':''}>▼</button>
+          </div>
+          <span class="settings-cat-name" style="flex:1;font-weight:700">${esc(cat)}</span>
+          <button class="btn-icon" title="名前を編集" onclick="editCatName('${esc(type)}',${idx},'${esc(cat)}')">✏️</button>
+          <button class="btn-add-sub" onclick="openSubModal('${esc(cat)}')">＋ 補助科目</button>
+          <button class="btn-icon danger" title="削除" onclick="deleteCat('${esc(type)}',${idx},'${esc(cat)}')">🗑️</button>
+        </div>
+        <div class="settings-tags" style="padding-left:38px">${tags}${subs.length===0?'<span class="no-sub">補助科目なし</span>':''}</div>
       </div>`;
     }).join('');
-    return`<div class="settings-type-header" style="background:${bg};color:${color}">${label}</div>${rows}`;
+    return`<div class="settings-type-header" style="background:${bg};color:${color};display:flex;justify-content:space-between;align-items:center">
+      <span>${label}</span>
+    </div>
+    ${catRows}
+    <div class="add-cat-row">
+      <input type="text" id="new-cat-${type}" placeholder="新しい勘定科目名を追加" onkeydown="if(event.key==='Enter')addCat('${type}')">
+      <button class="btn-blue" onclick="addCat('${type}')">追加</button>
+    </div>`;
   }).join('');
   // 口座セクション
   const accRows=ACCOUNTS.map(a=>{
@@ -645,38 +706,220 @@ function openEntryModal(id=null){
   document.getElementById('entry-modal-title').textContent=id?'仕訳を編集':'仕訳を入力';
   const e=id?entries.find(x=>x.id===id):null;
   const today=new Date().toISOString().slice(0,10);
-  document.getElementById('f-date').value    =e?.date||today;
-  document.getElementById('f-type').value    =e?.type||'expense';
-  document.getElementById('f-account').value =e?.account||'現金';
-  document.getElementById('f-desc').value    =e?.description||'';
-  document.getElementById('f-amount').value  =e?.amount||'';
-  populateCategorySelect(e?.type||'expense',e?.category);
-  populateSubSelect(e?.category||(CATEGORIES[e?.type||'expense'][0]),e?.sub);
-  populateAccountSubSelect(e?.account||'現金',e?.accountSub);
+  document.getElementById('f-date').value   =e?.date||today;
+  document.getElementById('f-type').value   =e?.type||'expense';
+  document.getElementById('f-desc').value   =e?.description||'';
+  document.getElementById('f-amount').value =e?.amount||'';
+  setSearchField('category', e?.category||'', e?.category||'');
+  setSearchField('sub', e?.sub||'', e?.sub||'');
+  setSearchField('account', e?.account||'現金', e?.account||'現金');
+  setSearchField('accountSub', e?.accountSub||'', e?.accountSub||'');
+  // update hints
+  const cat=e?.category||'食費';
+  const acc=e?.account||'現金';
+  const sh=document.getElementById('f-sub-hint');if(sh)sh.style.display=(subMap[cat]||[]).length===0?'block':'none';
+  const ah=document.getElementById('f-account-sub-hint');if(ah)ah.style.display=(accountSubMap[acc]||[]).length===0?'block':'none';
   document.getElementById('entry-modal').style.display='flex';
 }
 function openEditModal(id){openEntryModal(id);}
 function closeEntryModal(){document.getElementById('entry-modal').style.display='none';}
+
+// ===================== SEARCH ENGINE =====================
+// Romaji → hiragana conversion table
+const ROMAJI_MAP=(()=>{
+  const t={};
+  const rows=[
+    ['a','あ'],['i','い'],['u','う'],['e','え'],['o','お'],
+    ['ka','か'],['ki','き'],['ku','く'],['ke','け'],['ko','こ'],
+    ['sa','さ'],['si','し'],['shi','し'],['su','す'],['se','せ'],['so','そ'],
+    ['ta','た'],['ti','ち'],['chi','ち'],['tu','つ'],['tsu','つ'],['te','て'],['to','と'],
+    ['na','な'],['ni','に'],['nu','ぬ'],['ne','ね'],['no','の'],
+    ['ha','は'],['hi','ひ'],['hu','ふ'],['fu','ふ'],['he','へ'],['ho','ほ'],
+    ['ma','ま'],['mi','み'],['mu','む'],['me','め'],['mo','も'],
+    ['ya','や'],['yu','ゆ'],['yo','よ'],
+    ['ra','ら'],['ri','り'],['ru','る'],['re','れ'],['ro','ろ'],
+    ['wa','わ'],['wi','ゐ'],['we','ゑ'],['wo','を'],['n','ん'],
+    ['ga','が'],['gi','ぎ'],['gu','ぐ'],['ge','げ'],['go','ご'],
+    ['za','ざ'],['zi','じ'],['ji','じ'],['zu','ず'],['ze','ぜ'],['zo','ぞ'],
+    ['da','だ'],['di','ぢ'],['du','づ'],['de','で'],['do','ど'],
+    ['ba','ば'],['bi','び'],['bu','ぶ'],['be','べ'],['bo','ぼ'],
+    ['pa','ぱ'],['pi','ぴ'],['pu','ぷ'],['pe','ぺ'],['po','ぽ'],
+    ['kya','きゃ'],['kyu','きゅ'],['kyo','きょ'],
+    ['sha','しゃ'],['shu','しゅ'],['sho','しょ'],
+    ['cha','ちゃ'],['chu','ちゅ'],['cho','ちょ'],
+    ['nya','にゃ'],['nyu','にゅ'],['nyo','にょ'],
+    ['hya','ひゃ'],['hyu','ひゅ'],['hyo','ひょ'],
+    ['mya','みゃ'],['myu','みゅ'],['myo','みょ'],
+    ['rya','りゃ'],['ryu','りゅ'],['ryo','りょ'],
+    ['gya','ぎゃ'],['gyu','ぎゅ'],['gyo','ぎょ'],
+    ['ja','じゃ'],['ju','じゅ'],['jo','じょ'],
+    ['bya','びゃ'],['byu','びゅ'],['byo','びょ'],
+    ['pya','ぴゃ'],['pyu','ぴゅ'],['pyo','ぴょ'],
+  ];
+  // sort longest first so greedy matching works
+  rows.sort((a,b)=>b[0].length-a[0].length);
+  rows.forEach(([r,h])=>t[r]=h);
+  return t;
+})();
+
+function romajiToHiragana(str){
+  let s=str.toLowerCase(),out='';
+  while(s.length){
+    let matched=false;
+    for(const [r,h] of Object.entries(ROMAJI_MAP)){
+      if(s.startsWith(r)){out+=h;s=s.slice(r.length);matched=true;break;}
+    }
+    if(!matched){out+=s[0];s=s.slice(1);}
+  }
+  return out;
+}
+
+function hiraganaToKatakana(str){return str.replace(/[\u3041-\u3096]/g,c=>String.fromCharCode(c.charCodeAt(0)+0x60));}
+
+function normalizeQuery(q){
+  const lo=q.toLowerCase();
+  const hira=romajiToHiragana(lo);
+  const kata=hiraganaToKatakana(hira);
+  return[lo,hira,kata];
+}
+
+function matchesQuery(label, query){
+  if(!query)return true;
+  const lo=label.toLowerCase();
+  const hira=hiraganaToKatakana(label.replace(/[\u30A1-\u30F6]/g,c=>String.fromCharCode(c.charCodeAt(0)-0x60)));
+  const[qlo,qhira,qkata]=normalizeQuery(query);
+  return lo.includes(qlo)||lo.includes(qhira)||lo.includes(qkata)||hira.includes(qhira)||hira.includes(qlo);
+}
+
+function highlightMatch(label, query){
+  if(!query)return esc(label);
+  const lo=label.toLowerCase();
+  const[qlo]=normalizeQuery(query);
+  const idx=lo.indexOf(qlo);
+  if(idx>=0)return esc(label.slice(0,idx))+'<span class="match-highlight">'+esc(label.slice(idx,idx+qlo.length))+'</span>'+esc(label.slice(idx+qlo.length));
+  return esc(label);
+}
+
+// Each search context: { options:[], inputId, dropId, hiddenId, hintId?, focusIndex }
+const searchContexts={};
+let _focusIdx={};
+
+function getSearchOptions(type){
+  if(type==='category'){
+    const t=document.getElementById('f-type').value;
+    return CATEGORIES[t].map(c=>({value:c,label:c}));
+  }
+  if(type==='sub'){
+    const cat=document.getElementById('f-category').value;
+    return (subMap[cat]||[]).map(s=>({value:s,label:s}));
+  }
+  if(type==='account'){
+    return ACCOUNTS.map(a=>({value:a,label:a}));
+  }
+  if(type==='accountSub'){
+    const acc=document.getElementById('f-account').value;
+    return [{value:'',label:'（選択しない）'},...(accountSubMap[acc]||[]).map(s=>({value:s,label:s}))];
+  }
+  return[];
+}
+
+function openSearch(type){
+  _focusIdx[type]=-1;
+  filterSearch(type);
+  document.getElementById('f-'+type+'-drop').classList.add('open');
+}
+function delayClose(type){setTimeout(()=>{const d=document.getElementById('f-'+type+'-drop');if(d)d.classList.remove('open');},180);}
+
+function filterSearch(type){
+  const inputEl=document.getElementById('f-'+type+'-input');
+  const drop=document.getElementById('f-'+type+'-drop');
+  if(!inputEl||!drop)return;
+  const q=inputEl.value;
+  const opts=getSearchOptions(type).filter(o=>o.value===''||matchesQuery(o.label,q));
+  _focusIdx[type]=-1;
+  drop.innerHTML=opts.map((o,i)=>`<div class="search-opt" data-value="${esc(o.value)}" data-label="${esc(o.label)}" onclick="selectOpt('${type}','${esc(o.value)}','${esc(o.label)}')">${o.value===''?'<span style="color:#aaa">（選択しない）</span>':highlightMatch(o.label,q)}</div>`).join('');
+  if(opts.length>0)drop.classList.add('open');else drop.classList.remove('open');
+}
+
+function selectOpt(type, value, label){
+  document.getElementById('f-'+type).value=value;
+  document.getElementById('f-'+type+'-input').value=value===''?'':label;
+  document.getElementById('f-'+type+'-drop').classList.remove('open');
+  // side effects
+  if(type==='category'){
+    populateSubSearch();
+    const hint=document.getElementById('f-sub-hint');
+    if(hint)hint.style.display=(subMap[value]||[]).length===0?'block':'none';
+  }
+  if(type==='account'){
+    populateAccountSubSearch();
+    const hint=document.getElementById('f-account-sub-hint');
+    if(hint)hint.style.display=(accountSubMap[value]||[]).length===0?'block':'none';
+  }
+}
+
+function searchKeydown(e, type){
+  const drop=document.getElementById('f-'+type+'-drop');
+  const opts=drop.querySelectorAll('.search-opt');
+  if(!opts.length)return;
+  if(e.key==='ArrowDown'){e.preventDefault();_focusIdx[type]=Math.min((_focusIdx[type]||0)+1,opts.length-1);updateFocus(type,opts);}
+  else if(e.key==='ArrowUp'){e.preventDefault();_focusIdx[type]=Math.max((_focusIdx[type]||0)-1,0);updateFocus(type,opts);}
+  else if(e.key==='Enter'&&(_focusIdx[type]||0)>=0&&opts[_focusIdx[type]]){e.preventDefault();opts[_focusIdx[type]].click();}
+  else if(e.key==='Escape')drop.classList.remove('open');
+}
+function updateFocus(type,opts){
+  opts.forEach((o,i)=>o.classList.toggle('focused',i===_focusIdx[type]));
+  if(_focusIdx[type]>=0)opts[_focusIdx[type]].scrollIntoView({block:'nearest'});
+}
+
+function setSearchField(type, value, label){
+  const hi=document.getElementById('f-'+type+'-input');
+  const hd=document.getElementById('f-'+type);
+  if(hi)hi.value=label||value||'';
+  if(hd)hd.value=value||'';
+}
+function populateSubSearch(){
+  setSearchField('sub','','');
+  const hint=document.getElementById('f-sub-hint');
+  const cat=document.getElementById('f-category').value;
+  if(hint)hint.style.display=(subMap[cat]||[]).length===0?'block':'none';
+}
+function populateAccountSubSearch(){
+  setSearchField('accountSub','','');
+  const hint=document.getElementById('f-account-sub-hint');
+  const acc=document.getElementById('f-account').value;
+  if(hint)hint.style.display=(accountSubMap[acc]||[]).length===0?'block':'none';
+}
+
+// ===================== END SEARCH ENGINE =====================
 function populateCategorySelect(type,sel){
   document.getElementById('f-category').innerHTML=CATEGORIES[type].map(c=>`<option${c===sel?' selected':''}>${esc(c)}</option>`).join('');
 }
 function populateSubSelect(cat,sel){
   const subs=subMap[cat]||[];
-  document.getElementById('f-sub').innerHTML=`<option value="">— 選択しない —</option>`+subs.map(s=>`<option${s===sel?' selected':''}>${esc(s)}</option>`).join('');
-  document.getElementById('f-sub-hint').style.display=subs.length===0?'block':'none';
+  setSearchField('sub', sel||'', sel||'');
+  const hint=document.getElementById('f-sub-hint');
+  if(hint)hint.style.display=subs.length===0?'block':'none';
 }
 function populateAccountSubSelect(account, sel){
-  const subs = accountSubMap[account]||[];
-  document.getElementById('f-account-sub').innerHTML = '<option value="">— 選択しない —</option>'+subs.map(s=>`<option${s===sel?' selected':''}>${esc(s)}</option>`).join('');
-  document.getElementById('f-account-sub-hint').style.display = subs.length===0?'block':'none';
+  const subs=accountSubMap[account]||[];
+  setSearchField('accountSub', sel||'', sel||'');
+  const hint=document.getElementById('f-account-sub-hint');
+  if(hint)hint.style.display=subs.length===0?'block':'none';
 }
-function onAccountChange(){populateAccountSubSelect(document.getElementById('f-account').value, null);}
-function onTypeChange(){const t=document.getElementById('f-type').value;populateCategorySelect(t,null);populateSubSelect(CATEGORIES[t][0],null);}
-function onCategoryChange(){populateSubSelect(document.getElementById('f-category').value,null);}
+function onAccountChange(){populateAccountSubSearch();}
+function onTypeChange(){
+  const t=document.getElementById('f-type').value;
+  setSearchField('category','','');
+  setSearchField('sub','','');
+  const hint=document.getElementById('f-sub-hint');
+  if(hint)hint.style.display='none';
+}
+function onCategoryChange(){populateSubSearch();}
 function saveEntry(){
   const amount=Number(document.getElementById('f-amount').value);
   if(!amount||isNaN(amount)){alert('金額を入力してください');return;}
-  const entry={id:editingId||Date.now(),date:document.getElementById('f-date').value,type:document.getElementById('f-type').value,category:document.getElementById('f-category').value,sub:document.getElementById('f-sub').value,account:document.getElementById('f-account').value,accountSub:document.getElementById('f-account-sub').value,description:document.getElementById('f-desc').value,amount};
+  const entry={id:editingId||Date.now(),date:document.getElementById('f-date').value,type:document.getElementById('f-type').value,category:document.getElementById('f-category').value||document.getElementById('f-category-input').value,sub:document.getElementById('f-sub').value,account:document.getElementById('f-account').value||document.getElementById('f-account-input').value||'現金',accountSub:document.getElementById('f-account-sub').value,description:document.getElementById('f-desc').value,amount};
   if(editingId)entries=entries.map(e=>e.id===editingId?entry:e);else entries.push(entry);
   save('kk_entries',entries);closeEntryModal();render();
 }
@@ -771,6 +1014,56 @@ function saveFund(){
   save('kk_funds',funds);closeFundModal();render();
 }
 function deleteFund(id){if(!confirm('このファンドを削除しますか？'))return;funds=funds.filter(f=>f.id!==id);save('kk_funds',funds);render();}
+
+
+// ===================== CATEGORY MANAGEMENT =====================
+function addCat(type){
+  const input=document.getElementById('new-cat-'+type);
+  const name=input.value.trim();
+  if(!name)return;
+  if(CATEGORIES[type].includes(name)){alert('同じ名前の科目が既にあります');return;}
+  CATEGORIES[type]=[...CATEGORIES[type],name];
+  save('kk_categories',CATEGORIES);
+  input.value='';
+  render();
+}
+
+function deleteCat(type,idx,cat){
+  const used=entries.some(e=>e.category===cat);
+  const msg=used
+    ?`「${cat}」は仕訳で使用中です。削除すると関連仕訳の科目名はそのまま残ります。本当に削除しますか？`
+    :`「${cat}」を削除しますか？`;
+  if(!confirm(msg))return;
+  CATEGORIES[type]=CATEGORIES[type].filter((_,i)=>i!==idx);
+  save('kk_categories',CATEGORIES);
+  render();
+}
+
+function moveCat(type,idx,dir){
+  const arr=[...CATEGORIES[type]];
+  const ni=idx+dir;
+  if(ni<0||ni>=arr.length)return;
+  [arr[idx],arr[ni]]=[arr[ni],arr[idx]];
+  CATEGORIES[type]=arr;
+  save('kk_categories',CATEGORIES);
+  render();
+}
+
+function editCatName(type,idx,oldName){
+  const newName=prompt(`「${oldName}」の新しい名前を入力してください:`,oldName);
+  if(!newName||newName===oldName)return;
+  if(CATEGORIES[type].includes(newName)){alert('同じ名前の科目が既にあります');return;}
+  // rename in categories
+  CATEGORIES[type][idx]=newName;
+  // rename in entries
+  entries=entries.map(e=>e.category===oldName?{...e,category:newName}:e);
+  // rename in subMap
+  if(subMap[oldName]){subMap[newName]=subMap[oldName];delete subMap[oldName];}
+  save('kk_categories',CATEGORIES);
+  save('kk_entries',entries);
+  save('kk_subs',subMap);
+  render();
+}
 
 // ===================== ACCOUNT SUB MODAL =====================
 let accountSubModalTarget=null;
