@@ -159,6 +159,29 @@ tr:nth-child(even) td{background:#fafbfd;}
 .search-opt .opt-sub{font-size:11px;color:#999;margin-left:auto;}
 
 @media(max-width:500px){.col-account{display:none;}}
+/* ANALYSIS TAB */
+.analysis-block{background:var(--white);border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,0.08);padding:16px;margin-bottom:12px;}
+.analysis-filters{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;align-items:flex-end;}
+.analysis-filters .af-group{display:flex;flex-direction:column;gap:4px;min-width:120px;flex:1;}
+.analysis-filters label{font-size:11px;font-weight:600;color:#555;}
+.analysis-filters select{padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;background:#fafbfc;}
+.item-picker{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;}
+.item-chip{padding:5px 12px;border-radius:20px;border:1.5px solid var(--border);font-size:12px;font-weight:600;cursor:pointer;background:var(--white);color:#555;transition:all 0.15s;}
+.item-chip.selected{background:var(--navy);color:#fff;border-color:var(--navy);}
+.item-chip:hover:not(.selected){background:#f0f4fa;border-color:var(--blue);}
+.chart-area{position:relative;width:100%;height:260px;margin-top:8px;}
+.chart-svg{width:100%;height:100%;}
+.chart-legend{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:10px;}
+.legend-item{display:flex;align-items:center;gap:5px;font-size:12px;color:#555;}
+.legend-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
+.no-data{text-align:center;padding:60px 16px;color:#bbb;font-size:13px;}
+.store-table{width:100%;border-collapse:collapse;font-size:12px;margin-top:10px;}
+.store-table th{background:#f5f7fb;padding:7px 10px;text-align:left;font-weight:600;color:#555;border-bottom:2px solid var(--border);}
+.store-table td{padding:7px 10px;border-bottom:1px solid #f0f0f0;}
+.range-selector{display:flex;gap:4px;margin-bottom:10px;flex-wrap:wrap;}
+.range-btn{padding:4px 10px;border:1px solid var(--border);border-radius:6px;background:var(--white);font-size:11px;cursor:pointer;color:#555;}
+.range-btn.active{background:var(--navy);color:#fff;border-color:var(--navy);}
+
 /* CATEGORY MANAGEMENT */
 .cat-manage-row{display:flex;align-items:center;gap:8px;padding:8px 16px;border-bottom:1px solid #f2f2f2;}
 .cat-manage-name{flex:1;font-size:13px;font-weight:600;}
@@ -192,6 +215,7 @@ tr:nth-child(even) td{background:#fafbfd;}
       <button class="tab-btn"        data-tab="graph"    onclick="switchTab(this)">グラフ</button>
       <button class="tab-btn"        data-tab="trial"    onclick="switchTab(this)">残高試算表</button>
       <button class="tab-btn"        data-tab="invest"   onclick="switchTab(this)">投資信託</button>
+      <button class="tab-btn"        data-tab="analysis" onclick="switchTab(this)">分析</button>
       <button class="tab-btn"        data-tab="settings" onclick="switchTab(this)">補助科目</button>
     </div>
   </div>
@@ -363,6 +387,7 @@ let currentTab   = 'ledger';
 let editingId    = null;
 let subModalCat  = null;
 let editingFundId= null;
+let analysisState= load('kk_analysis_state', {cat:'', sub:'', selectedItems:[], range:12});
 
 const fmt  = n => Math.abs(n).toLocaleString('ja-JP');
 const fmts = n => (n<0?'−':'')+'¥'+fmt(n);
@@ -432,6 +457,7 @@ function render(){
   if(currentTab==='graph')    main.innerHTML=renderGraph(filtered,totalIncome,totalExpense,balance);
   if(currentTab==='trial')    main.innerHTML=renderTrial();
   if(currentTab==='invest')   main.innerHTML=renderInvest();
+  if(currentTab==='analysis') main.innerHTML=renderAnalysis();
   if(currentTab==='settings') main.innerHTML=renderSettings();
 }
 
@@ -1015,6 +1041,232 @@ function saveFund(){
 }
 function deleteFund(id){if(!confirm('このファンドを削除しますか？'))return;funds=funds.filter(f=>f.id!==id);save('kk_funds',funds);render();}
 
+
+
+// ===================== ANALYSIS =====================
+const LINE_COLORS=['#4A90D9','#e05050','#1a7a4c','#e07800','#7b3fbf','#0a8a8a','#c44569','#2c3e50'];
+
+function parseDescription(desc){
+  // split on full-width or half-width spaces
+  const parts=desc.trim().split(/[\s\u3000]+/).filter(Boolean);
+  if(parts.length===0)return{item:'',store:''};
+  // check if first token looks like a period prefix e.g. "3月分"
+  const periodRe=/^[\d０-９]+月分$/;
+  let idx=0;
+  if(periodRe.test(parts[0]))idx=1;
+  const item=parts[idx]||'';
+  const store=parts.slice(idx+1).join(' ');
+  return{item,store};
+}
+
+function getMonthRange(n){
+  // returns array of 'YYYY-MM' strings, last n months up to latest entry or today
+  const dates=entries.map(e=>e.date.slice(0,7)).filter(Boolean);
+  let base=dates.length?[...dates].sort().reverse()[0]:new Date().toISOString().slice(0,7);
+  const[by,bm]=base.split('-').map(Number);
+  const months=[];
+  for(let i=n-1;i>=0;i--){
+    const d=new Date(by,bm-1-i,1);
+    months.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`);
+  }
+  return months;
+}
+
+function getAnalysisItems(){
+  const{cat,sub}=analysisState;
+  const filtered=entries.filter(e=>{
+    if(cat&&e.category!==cat)return false;
+    if(sub&&e.sub!==sub)return false;
+    return true;
+  });
+  // collect unique item names from descriptions
+  const itemSet={};
+  filtered.forEach(e=>{
+    const{item}=parseDescription(e.description);
+    if(item)itemSet[item]=(itemSet[item]||0)+1;
+  });
+  return Object.entries(itemSet).sort((a,b)=>b[1]-a[1]).map(([item])=>item);
+}
+
+function getMonthlyData(item, months){
+  return months.map(ym=>{
+    const matched=entries.filter(e=>{
+      if(analysisState.cat&&e.category!==analysisState.cat)return false;
+      if(analysisState.sub&&e.sub!==analysisState.sub)return false;
+      if(!e.date.startsWith(ym))return false;
+      const{item:ei}=parseDescription(e.description);
+      return ei===item;
+    });
+    if(!matched.length)return null;
+    const total=matched.reduce((s,e)=>s+e.amount,0);
+    return{ym,total,count:matched.length,avg:Math.round(total/matched.length)};
+  });
+}
+
+function drawLineChart(seriesArr, months){
+  if(!seriesArr.length||!months.length)return'<div class="no-data">データがありません</div>';
+
+  const PAD={top:20,right:16,bottom:36,left:58};
+  const W=600,H=260;
+  const cW=W-PAD.left-PAD.right;
+  const cH=H-PAD.top-PAD.bottom;
+
+  // find value range
+  const allVals=seriesArr.flatMap(s=>s.data.filter(Boolean).map(d=>d.avg));
+  if(!allVals.length)return'<div class="no-data">選択期間にデータがありません</div>';
+  const minV=Math.max(0,Math.min(...allVals)*0.85);
+  const maxV=Math.max(...allVals)*1.1||1;
+  const yRange=maxV-minV;
+
+  const xStep=cW/(months.length-1||1);
+  const toX=i=>PAD.left+i*xStep;
+  const toY=v=>PAD.top+cH-(((v-minV)/yRange)*cH);
+
+  // Y gridlines
+  const yTicks=5;
+  let gridLines='',yLabels='';
+  for(let i=0;i<=yTicks;i++){
+    const v=minV+(yRange/yTicks)*i;
+    const y=toY(v);
+    gridLines+=`<line x1="${PAD.left}" y1="${y}" x2="${W-PAD.right}" y2="${y}" stroke="#eee" stroke-width="1"/>`;
+    yLabels+=`<text x="${PAD.left-6}" y="${y+4}" text-anchor="end" font-size="10" fill="#999">¥${Math.round(v).toLocaleString()}</text>`;
+  }
+
+  // X labels
+  let xLabels='';
+  months.forEach((ym,i)=>{
+    const mo=Number(ym.split('-')[1]);
+    const skip=months.length>12?i%3!==0:false;
+    if(!skip)xLabels+=`<text x="${toX(i)}" y="${H-PAD.bottom+16}" text-anchor="middle" font-size="10" fill="#999">${mo}月</text>`;
+  });
+
+  // Lines + dots
+  let lines='',dots='',areas='';
+  seriesArr.forEach((s,si)=>{
+    const color=LINE_COLORS[si%LINE_COLORS.length];
+    // build path
+    const pts=s.data.map((d,i)=>d?{x:toX(i),y:toY(d.avg),d}:null);
+    // area fill
+    const validPts=pts.filter(Boolean);
+    if(validPts.length>=2){
+      let aPath=`M ${validPts[0].x} ${toY(minV)} L ${validPts[0].x} ${validPts[0].y}`;
+      validPts.forEach(p=>aPath+=` L ${p.x} ${p.y}`);
+      aPath+=` L ${validPts[validPts.length-1].x} ${toY(minV)} Z`;
+      areas+=`<path d="${aPath}" fill="${color}" opacity="0.07"/>`;
+    }
+    // line segments (skip gaps where null)
+    let lPath='';
+    pts.forEach((p,i)=>{
+      if(!p)return;
+      const prev=pts.slice(0,i).reverse().find(Boolean);
+      lPath+=prev?`M ${prev.x} ${prev.y} L ${p.x} ${p.y} `:``;
+      if(!prev)lPath+=`M ${p.x} ${p.y} `;
+    });
+    lines+=`<path d="${lPath.trim()}" fill="none" stroke="${color}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>`;
+    // dots + tooltips
+    pts.forEach((p,i)=>{
+      if(!p)return;
+      dots+=`<g>
+        <circle cx="${p.x}" cy="${p.y}" r="5" fill="${color}" stroke="#fff" stroke-width="2"/>
+        <title>${months[i]} ${s.item}: ¥${p.d.avg.toLocaleString()}（${p.d.count}件）</title>
+      </g>`;
+    });
+  });
+
+  return`<svg class="chart-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet">
+    ${gridLines}${yLabels}${xLabels}${areas}${lines}${dots}
+  </svg>`;
+}
+
+function renderAnalysis(){
+  const{cat,sub,selectedItems,range}=analysisState;
+
+  // filter controls
+  const catOpts=`<option value="">すべての科目</option>`
+    +[...CATEGORIES.income,...CATEGORIES.expense].map(c=>`<option value="${esc(c)}"${c===cat?' selected':''}>${esc(c)}</option>`).join('');
+  const subOpts=`<option value="">すべての補助科目</option>`
+    +(cat?(subMap[cat]||[]):Object.values(subMap).flat()).filter((v,i,a)=>a.indexOf(v)===i)
+    .map(s=>`<option value="${esc(s)}"${s===sub?' selected':''}>${esc(s)}</option>`).join('');
+
+  const filters=`<div class="analysis-filters">
+    <div class="af-group"><label>勘定科目</label>
+      <select onchange="setAnalysisCat(this.value)">${catOpts}</select>
+    </div>
+    <div class="af-group"><label>補助科目</label>
+      <select onchange="setAnalysisSub(this.value)">${subOpts}</select>
+    </div>
+  </div>`;
+
+  // range selector
+  const ranges=[3,6,12,24];
+  const rangeBtns=`<div class="range-selector">${ranges.map(r=>`<button class="range-btn${r===range?' active':''}" onclick="setAnalysisRange(${r})">${r}ヶ月</button>`).join('')}</div>`;
+
+  // item chips
+  const items=getAnalysisItems();
+  const chips=items.length
+    ?items.map(item=>`<div class="item-chip${selectedItems.includes(item)?' selected':''}" onclick="toggleAnalysisItem('${esc(item)}')">${esc(item)}</div>`).join('')
+    :'<div style="color:#bbb;font-size:13px">該当する摘要データがありません</div>';
+
+  // chart
+  const months=getMonthRange(range);
+  const activeSeries=selectedItems.map(item=>({item,data:getMonthlyData(item,months)})).filter(s=>s.data.some(Boolean));
+  const chartHtml=activeSeries.length?drawLineChart(activeSeries,months):'<div class="no-data">費目を選択すると折れ線グラフが表示されます</div>';
+
+  // legend
+  const legend=activeSeries.map((s,i)=>`<div class="legend-item"><span class="legend-dot" style="background:${LINE_COLORS[i%LINE_COLORS.length]}"></span>${esc(s.item)}</div>`).join('');
+
+  // store breakdown table for selected items
+  let storeHtml='';
+  if(selectedItems.length===1){
+    const item=selectedItems[0];
+    const storeMap={};
+    entries.filter(e=>{
+      if(cat&&e.category!==cat)return false;
+      if(sub&&e.sub!==sub)return false;
+      const{item:ei}=parseDescription(e.description);
+      return ei===item;
+    }).forEach(e=>{
+      const{store}=parseDescription(e.description);
+      const s=store||'（不明）';
+      if(!storeMap[s])storeMap[s]={total:0,count:0,min:Infinity,max:-Infinity};
+      storeMap[s].total+=e.amount;
+      storeMap[s].count++;
+      storeMap[s].min=Math.min(storeMap[s].min,e.amount);
+      storeMap[s].max=Math.max(storeMap[s].max,e.amount);
+    });
+    const storeRows=Object.entries(storeMap).sort((a,b)=>b[1].count-a[1].count).map(([store,d])=>`<tr>
+      <td>${esc(store)}</td>
+      <td style="text-align:right">${d.count}回</td>
+      <td style="text-align:right">¥${Math.round(d.total/d.count).toLocaleString()}</td>
+      <td style="text-align:right">¥${d.min.toLocaleString()}〜¥${d.max.toLocaleString()}</td>
+    </tr>`).join('');
+    if(storeRows)storeHtml=`<div style="margin-top:16px">
+      <div class="graph-title">購入場所別内訳（${esc(item)}）</div>
+      <table class="store-table"><thead><tr><th>購入場所</th><th style="text-align:right">回数</th><th style="text-align:right">平均単価</th><th style="text-align:right">価格帯</th></tr></thead>
+      <tbody>${storeRows}</tbody></table></div>`;
+  }
+
+  return`<div class="analysis-block">
+    <div class="graph-title">費目別 価格推移分析</div>
+    ${filters}
+    <div style="font-size:11px;font-weight:600;color:#555;margin-bottom:6px">費目を選択（複数可）</div>
+    <div class="item-picker">${chips}</div>
+    ${rangeBtns}
+    <div class="chart-area">${chartHtml}</div>
+    ${legend?`<div class="chart-legend">${legend}</div>`:''}
+    ${storeHtml}
+  </div>`;
+}
+
+function setAnalysisCat(v){analysisState.cat=v;analysisState.sub='';analysisState.selectedItems=[];save('kk_analysis_state',analysisState);render();}
+function setAnalysisSub(v){analysisState.sub=v;analysisState.selectedItems=[];save('kk_analysis_state',analysisState);render();}
+function setAnalysisRange(v){analysisState.range=v;save('kk_analysis_state',analysisState);render();}
+function toggleAnalysisItem(item){
+  const idx=analysisState.selectedItems.indexOf(item);
+  if(idx>=0)analysisState.selectedItems.splice(idx,1);
+  else analysisState.selectedItems.push(item);
+  save('kk_analysis_state',analysisState);render();
+}
 
 // ===================== CATEGORY MANAGEMENT =====================
 function addCat(type){
