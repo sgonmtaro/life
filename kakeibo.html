@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="かけいちょう">
+<meta name="theme-color" content="#1a2744">
+<title>かけいちょう</title>
+<script>
+const manifestData = {
+  name:"かけいちょう", short_name:"かけいちょう", description:"弥生会計風の家計簿アプリ",
+  start_url:"./", display:"standalone", background_color:"#F0F2F5", theme_color:"#1a2744",
+  icons:[{src:"data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' rx='32' fill='%231a2744'/><text x='96' y='130' font-size='110' text-anchor='middle' fill='white' font-family='sans-serif'>家</text></svg>",sizes:"192x192",type:"image/svg+xml"}]
+};
+const _mblob = new Blob([JSON.stringify(manifestData)],{type:'application/json'});
+document.addEventListener('DOMContentLoaded',()=>{const l=document.createElement('link');l.rel='manifest';l.href=URL.createObjectURL(_mblob);document.head.appendChild(l);});
+</script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --bg:#F0F2F5;--white:#fff;--navy:#1a2744;--blue:#4A90D9;
+  --green:#1a7a4c;--red:#b93030;--green-bg:#e8f6ee;--red-bg:#fceaea;
+  --border:#dde1ea;--text:#1a1a2e;--muted:#888;
+  --safe-top:env(safe-area-inset-top,0px);--safe-bot:env(safe-area-inset-bottom,0px);
+}
+html,body{height:100%;background:var(--bg);font-family:'Hiragino Sans','Meiryo',sans-serif;color:var(--text);-webkit-tap-highlight-color:transparent;}
+button,select,input{font-family:inherit;-webkit-appearance:none;}
+select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23888'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;padding-right:28px!important;}
+#app{display:flex;flex-direction:column;height:100%;}
+#header{background:var(--navy);color:#fff;padding:calc(var(--safe-top) + 10px) 16px 10px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 2px 8px rgba(0,0,0,0.2);flex-shrink:0;}
+.logo{display:flex;align-items:center;gap:10px;}
+.logo-icon{width:30px;height:30px;background:var(--blue);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;}
+.app-title{font-weight:700;font-size:17px;letter-spacing:0.04em;}
+.btn-add{background:var(--blue);color:#fff;border:none;border-radius:8px;padding:8px 16px;font-weight:700;font-size:14px;cursor:pointer;}
+#nav{background:var(--white);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 12px;flex-shrink:0;overflow-x:auto;}
+.month-nav{display:flex;align-items:center;gap:4px;padding:10px 0;flex-shrink:0;}
+.month-nav button{border:1px solid var(--border);background:var(--white);border-radius:6px;width:30px;height:30px;font-size:16px;cursor:pointer;color:#444;}
+.month-label{font-weight:700;font-size:14px;min-width:76px;text-align:center;}
+.tabs{display:flex;flex-shrink:0;}
+.tab-btn{padding:12px 9px;border:none;background:transparent;cursor:pointer;font-size:12px;color:#666;border-bottom:3px solid transparent;white-space:nowrap;font-weight:500;transition:all 0.15s;}
+.tab-btn.active{color:var(--navy);font-weight:700;border-bottom-color:var(--blue);}
+#summary-bar{display:flex;gap:10px;padding:12px 12px 8px;flex-shrink:0;}
+.summary-card{background:var(--white);border-radius:10px;padding:8px 14px;flex:1;border:1px solid var(--border);box-shadow:0 1px 3px rgba(0,0,0,0.06);}
+.s-label{font-size:10px;color:var(--muted);margin-bottom:2px;}
+.s-value{font-weight:700;font-size:17px;}
+#main{flex:1;overflow-y:auto;padding:0 12px calc(var(--safe-bot) + 16px);-webkit-overflow-scrolling:touch;}
+.table-wrap{background:var(--white);border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,0.08);overflow:hidden;margin-bottom:12px;}
+table{width:100%;border-collapse:collapse;font-size:13px;}
+th{padding:10px;background:#f5f7fb;text-align:left;font-weight:600;color:#444;font-size:11px;border-bottom:2px solid var(--border);white-space:nowrap;}
+td{padding:9px 10px;border-bottom:1px solid #eef0f4;vertical-align:middle;}
+tr:last-child td{border-bottom:none;}
+tr:nth-child(even) td{background:#fafbfd;}
+.badge{display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;}
+.badge-income{background:var(--green-bg);color:var(--green);}
+.badge-expense{background:var(--red-bg);color:var(--red);}
+.sub-label{color:var(--blue);font-size:11px;}
+.amt-income{color:var(--green);font-weight:700;}
+.amt-expense{color:var(--red);font-weight:700;}
+.amt-neutral{color:#555;font-weight:700;}
+.btn-edit{border:1px solid var(--border);background:var(--white);border-radius:5px;padding:4px 8px;cursor:pointer;font-size:11px;color:#444;}
+.btn-del{border:1px solid #e8a0a0;background:var(--white);border-radius:5px;padding:4px 8px;cursor:pointer;font-size:11px;color:var(--red);margin-left:3px;}
+.summary-grid{display:flex;flex-direction:column;gap:12px;}
+@media(min-width:600px){.summary-grid{flex-direction:row;}.summary-grid>*{flex:1;}}
+.summary-block{background:var(--white);border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,0.08);overflow:hidden;}
+.summary-header{padding:11px 14px;font-weight:700;font-size:13px;}
+.summary-row{display:flex;justify-content:space-between;align-items:center;padding:8px 14px;border-bottom:1px solid #f2f2f2;font-size:13px;}
+.summary-row.cat-row{background:#f9f9fb;font-weight:700;}
+.summary-row.sub-row{padding-left:28px;font-size:12px;color:#666;}
+.summary-row.total-row{font-weight:700;}
+.graph-block{background:var(--white);border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,0.08);padding:16px;margin-bottom:12px;}
+.graph-title{font-weight:700;font-size:14px;margin-bottom:14px;color:#333;}
+.graph-item{margin-bottom:14px;}
+.graph-item-header{display:flex;justify-content:space-between;margin-bottom:5px;font-size:13px;}
+.graph-bar-bg{background:#f0f2f5;border-radius:5px;height:14px;overflow:hidden;display:flex;}
+.graph-bar-seg{height:100%;transition:width 0.4s;}
+.graph-legend{display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:4px;}
+.graph-legend-item{font-size:11px;color:#666;display:flex;align-items:center;gap:3px;}
+.graph-dot{width:8px;height:8px;border-radius:2px;display:inline-block;}
+.balance-box{margin-top:20px;padding:14px;background:#f5f7fb;border-radius:10px;}
+.balance-header{display:flex;justify-content:space-between;font-size:13px;margin-bottom:8px;}
+.balance-bar-bg{background:#e0e4ec;border-radius:6px;height:18px;overflow:hidden;}
+.balance-bar-fill{height:100%;transition:width 0.4s;border-radius:6px 0 0 6px;}
+.balance-result{text-align:right;margin-top:6px;font-weight:700;font-size:14px;}
+/* 残高試算表 */
+.trial-block{background:var(--white);border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,0.08);overflow:hidden;margin-bottom:12px;}
+.trial-header{padding:12px 16px;background:#f5f7fb;border-bottom:2px solid var(--border);font-weight:700;font-size:13px;color:var(--navy);display:flex;justify-content:space-between;align-items:center;}
+.trial-row{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:0;border-bottom:1px solid #f0f0f0;}
+.trial-row>div{padding:9px 14px;font-size:13px;}
+.trial-row>div:not(:first-child){text-align:right;}
+.trial-row.head>div{background:#f5f7fb;font-weight:700;font-size:11px;color:#555;border-bottom:2px solid var(--border);}
+.trial-row.total-row>div{background:#eef4fc;font-weight:700;border-top:2px solid var(--border);}
+.trend-chart{background:var(--white);border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,0.08);padding:16px;margin-bottom:12px;}
+.trend-bars{display:flex;align-items:flex-end;gap:4px;height:120px;margin-top:12px;}
+.trend-bar-wrap{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;}
+.trend-bar{width:100%;border-radius:4px 4px 0 0;transition:height 0.4s;min-height:2px;}
+.trend-label{font-size:9px;color:#888;text-align:center;}
+.trend-val{font-size:9px;font-weight:700;text-align:center;}
+/* 投資信託 */
+.invest-block{background:var(--white);border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,0.08);overflow:hidden;margin-bottom:12px;}
+.invest-header{padding:12px 16px;background:#f5f7fb;border-bottom:1px solid var(--border);font-weight:700;font-size:13px;color:var(--navy);display:flex;justify-content:space-between;align-items:center;}
+.invest-summary{display:flex;gap:10px;padding:12px 16px;border-bottom:1px solid #f0f0f0;flex-wrap:wrap;}
+.invest-kpi{flex:1;min-width:80px;}
+.invest-kpi .k-label{font-size:10px;color:var(--muted);margin-bottom:2px;}
+.invest-kpi .k-val{font-weight:700;font-size:16px;}
+.fund-card{padding:14px 16px;border-bottom:1px solid #f0f0f0;}
+.fund-name{font-weight:700;font-size:14px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;}
+.fund-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;}
+.fund-cell .fc-label{font-size:10px;color:var(--muted);margin-bottom:2px;}
+.fund-cell .fc-val{font-weight:600;font-size:13px;}
+.fund-bar-wrap{margin-top:8px;}
+.fund-bar-bg{background:#f0f2f5;border-radius:4px;height:8px;overflow:hidden;}
+.fund-bar-fill{height:100%;border-radius:4px;transition:width 0.4s;}
+/* settings */
+.settings-block{background:var(--white);border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,0.08);overflow:hidden;}
+.settings-header{padding:13px 16px;background:#f5f7fb;border-bottom:1px solid var(--border);font-weight:700;font-size:13px;color:var(--navy);}
+.settings-type-header{padding:7px 16px;font-weight:700;font-size:11px;border-bottom:1px solid #eee;}
+.settings-cat-row{display:flex;align-items:flex-start;gap:10px;padding:10px 16px;border-bottom:1px solid #f2f2f2;}
+.settings-cat-name{min-width:80px;font-weight:700;font-size:13px;padding-top:5px;flex-shrink:0;}
+.settings-tags{flex:1;display:flex;flex-wrap:wrap;gap:5px;}
+.sub-tag{display:inline-flex;align-items:center;gap:3px;background:#eef4fc;color:#2a6cb0;border:1px solid #c0d8f0;border-radius:12px;padding:3px 8px;font-size:12px;font-weight:600;}
+.sub-tag button{border:none;background:none;cursor:pointer;color:#999;font-size:13px;padding:0;line-height:1;}
+.btn-add-sub{border:1px solid var(--blue);color:var(--blue);background:var(--white);border-radius:6px;padding:5px 12px;cursor:pointer;font-size:12px;font-weight:600;white-space:nowrap;flex-shrink:0;}
+.no-sub{font-size:12px;color:#ccc;padding-top:5px;}
+/* modal */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);display:flex;align-items:flex-end;justify-content:center;z-index:200;}
+@media(min-width:600px){.modal-overlay{align-items:center;}}
+.modal-box{background:var(--white);border-radius:18px 18px 0 0;padding:20px 20px calc(var(--safe-bot) + 20px);width:100%;max-width:500px;box-shadow:0 -4px 24px rgba(0,0,0,0.15);max-height:92vh;overflow-y:auto;}
+@media(min-width:600px){.modal-box{border-radius:14px;padding-bottom:20px;max-height:85vh;}}
+.modal-title{font-weight:700;font-size:16px;margin-bottom:18px;color:var(--navy);}
+.field{display:flex;flex-direction:column;gap:5px;margin-bottom:13px;}
+.field label{font-size:12px;font-weight:600;color:#555;}
+.field input,.field select{padding:11px 12px;border:1px solid var(--border);border-radius:8px;font-size:15px;background:#fafbfc;color:var(--text);width:100%;}
+.field .hint{font-size:11px;color:#aaa;}
+.modal-actions{display:flex;gap:10px;margin-top:20px;}
+.btn-cancel{flex:1;padding:13px;border:1px solid var(--border);border-radius:10px;background:var(--white);font-weight:600;font-size:15px;cursor:pointer;color:#555;}
+.btn-save{flex:2;padding:13px;border:none;border-radius:10px;background:var(--navy);color:var(--white);font-weight:700;font-size:15px;cursor:pointer;}
+.sub-list{display:flex;flex-direction:column;gap:6px;margin-bottom:14px;max-height:180px;overflow-y:auto;}
+.sub-list-item{display:flex;align-items:center;justify-content:space-between;background:#eef4fc;border-radius:8px;padding:9px 12px;}
+.sub-list-item span{font-size:13px;font-weight:600;color:#2a6cb0;}
+.sub-list-item button{border:none;background:none;cursor:pointer;color:var(--red);font-size:16px;font-weight:700;padding:0 4px;}
+.sub-add-row{display:flex;gap:8px;}
+.sub-add-row input{flex:1;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;}
+.btn-blue{background:var(--blue);color:#fff;border:none;border-radius:8px;padding:10px 16px;font-weight:700;cursor:pointer;white-space:nowrap;}
+.btn-close{margin-top:16px;width:100%;padding:12px;border:1px solid var(--border);border-radius:10px;background:var(--white);font-weight:600;font-size:15px;cursor:pointer;color:#555;}
+.section-title{font-weight:700;font-size:13px;color:var(--navy);margin:14px 0 8px;padding-left:2px;}
+.empty{text-align:center;padding:48px 16px;color:#bbb;font-size:14px;}
+@media(max-width:500px){.col-account{display:none;}}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="header">
+    <div class="logo">
+      <div class="logo-icon">家</div>
+      <span class="app-title">かけいちょう</span>
+    </div>
+    <button class="btn-add" onclick="openEntryModal()">＋ 仕訳入力</button>
+  </div>
+  <div id="nav">
+    <div class="month-nav">
+      <button onclick="changeMonth(-1)">‹</button>
+      <span class="month-label" id="month-label"></span>
+      <button onclick="changeMonth(1)">›</button>
+    </div>
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="ledger"   onclick="switchTab(this)">仕訳帳</button>
+      <button class="tab-btn"        data-tab="summary"  onclick="switchTab(this)">集計</button>
+      <button class="tab-btn"        data-tab="graph"    onclick="switchTab(this)">グラフ</button>
+      <button class="tab-btn"        data-tab="trial"    onclick="switchTab(this)">残高試算表</button>
+      <button class="tab-btn"        data-tab="invest"   onclick="switchTab(this)">投資信託</button>
+      <button class="tab-btn"        data-tab="settings" onclick="switchTab(this)">補助科目</button>
+    </div>
+  </div>
+  <div id="summary-bar">
+    <div class="summary-card"><div class="s-label">収入</div><div class="s-value amt-income"  id="s-income">¥0</div></div>
+    <div class="summary-card"><div class="s-label">支出</div><div class="s-value amt-expense" id="s-expense">¥0</div></div>
+    <div class="summary-card"><div class="s-label">収支</div><div class="s-value"              id="s-balance">¥0</div></div>
+  </div>
+  <div id="main"></div>
+</div>
+
+<!-- Entry Modal -->
+<div class="modal-overlay" id="entry-modal" style="display:none">
+  <div class="modal-box">
+    <div class="modal-title" id="entry-modal-title">仕訳を入力</div>
+    <div class="field"><label>日付</label><input type="date" id="f-date"></div>
+    <div class="field"><label>種別</label>
+      <select id="f-type" onchange="onTypeChange()">
+        <option value="income">収入</option><option value="expense">支出</option>
+      </select>
+    </div>
+    <div class="field"><label>勘定科目</label><select id="f-category" onchange="onCategoryChange()"></select></div>
+    <div class="field">
+      <label>補助科目 <span style="color:#aaa;font-weight:400">（任意）</span></label>
+      <select id="f-sub"></select>
+      <span class="hint" id="f-sub-hint" style="display:none">「補助科目」タブで追加できます</span>
+    </div>
+    <div class="field"><label>口座</label>
+      <select id="f-account"><option>現金</option><option>銀行口座</option><option>クレジットカード</option><option>電子マネー</option></select>
+    </div>
+    <div class="field"><label>摘要</label><input type="text" id="f-desc" placeholder="例：スーパー買い物"></div>
+    <div class="field"><label>金額（円）</label><input type="number" id="f-amount" placeholder="0" min="0" inputmode="numeric"></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeEntryModal()">キャンセル</button>
+      <button class="btn-save"   onclick="saveEntry()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- Sub Modal -->
+<div class="modal-overlay" id="sub-modal" style="display:none">
+  <div class="modal-box">
+    <div class="modal-title" id="sub-modal-title">補助科目</div>
+    <div class="sub-list" id="sub-list"></div>
+    <div class="sub-add-row">
+      <input type="text" id="new-sub-input" placeholder="新しい補助科目名" onkeydown="if(event.key==='Enter')addSub()">
+      <button class="btn-blue" onclick="addSub()">追加</button>
+    </div>
+    <button class="btn-close" onclick="closeSubModal()">閉じる</button>
+  </div>
+</div>
+
+<!-- 期首残高設定 Modal -->
+<div class="modal-overlay" id="opening-modal" style="display:none">
+  <div class="modal-box">
+    <div class="modal-title">口座別 期首残高設定</div>
+    <p style="font-size:12px;color:#888;margin-bottom:16px">年初または管理開始時点の残高を入力してください</p>
+    <div id="opening-fields"></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeOpeningModal()">キャンセル</button>
+      <button class="btn-save"   onclick="saveOpeningBalances()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 投資信託 追加/編集 Modal -->
+<div class="modal-overlay" id="fund-modal" style="display:none">
+  <div class="modal-box">
+    <div class="modal-title" id="fund-modal-title">ファンドを追加</div>
+    <div class="field"><label>ファンド名</label><input type="text" id="ff-name" placeholder="例：eMAXIS Slim 全世界株式"></div>
+    <div class="field"><label>購入金額合計（円）</label><input type="number" id="ff-cost" placeholder="0" min="0" inputmode="numeric"></div>
+    <div class="field"><label>現在の評価額（円）</label><input type="number" id="ff-value" placeholder="0" min="0" inputmode="numeric"></div>
+    <div class="field"><label>積立開始日</label><input type="date" id="ff-start"></div>
+    <div class="field"><label>月次積立額（円）<span style="color:#aaa;font-weight:400">（任意）</span></label><input type="number" id="ff-monthly" placeholder="0" min="0" inputmode="numeric"></div>
+    <div class="field"><label>メモ</label><input type="text" id="ff-memo" placeholder="例：NISA口座"></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeFundModal()">キャンセル</button>
+      <button class="btn-save"   onclick="saveFund()">保存</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===================== CONSTANTS =====================
+const CATEGORIES = {
+  income:  ["給与","副業","賞与","利息","その他収入"],
+  expense: ["食費","住居費","光熱費","通信費","交通費","医療費","教育費","娯楽費","衣料費","日用品","保険料","その他支出"]
+};
+const ACCOUNTS = ["現金","銀行口座","クレジットカード","電子マネー"];
+const MONTHS = ["1月","2月","3月","4月","5月","6月","7月","8月","9月","10月","11月","12月"];
+const BAR_COLORS = ["#4A90D9","#6aacf0","#92c5f7","#b8dafb","#d8effe"];
+
+const DEFAULT_SUBS = {
+  "食費":["外食","自炊・食材","カフェ","コンビニ・スナック"],
+  "住居費":["家賃","管理費","駐車場"],
+  "光熱費":["電気","ガス","水道"],
+  "通信費":["スマホ","インターネット","NHK・受信料"],
+  "交通費":["電車・バス","タクシー","ガソリン"],
+  "給与":["本給","残業代"],
+  "副業":["フリーランス","投資配当"]
+};
+
+const DEFAULT_ENTRIES = [
+  {id:1,date:"2026-06-01",type:"income", category:"給与",  sub:"本給",              account:"銀行口座",       description:"6月分給与",      amount:280000},
+  {id:2,date:"2026-06-03",type:"expense",category:"食費",  sub:"自炊・食材",        account:"現金",           description:"スーパー買い物", amount:4200},
+  {id:3,date:"2026-06-05",type:"expense",category:"光熱費",sub:"電気",              account:"銀行口座",       description:"電気代",         amount:8500},
+  {id:4,date:"2026-06-10",type:"expense",category:"通信費",sub:"スマホ",            account:"クレジットカード",description:"スマホ料金",     amount:3800},
+  {id:5,date:"2026-06-12",type:"expense",category:"食費",  sub:"コンビニ・スナック",account:"電子マネー",     description:"コンビニ",      amount:650},
+  {id:6,date:"2026-06-15",type:"expense",category:"交通費",sub:"電車・バス",        account:"電子マネー",     description:"定期代",         amount:12000},
+  {id:7,date:"2026-06-18",type:"expense",category:"食費",  sub:"外食",              account:"クレジットカード",description:"外食",          amount:5600},
+  {id:8,date:"2026-06-20",type:"income", category:"副業",  sub:"フリーランス",      account:"銀行口座",       description:"フリーランス報酬",amount:35000},
+  {id:9,date:"2026-06-22",type:"expense",category:"日用品",sub:"",                  account:"現金",           description:"洗剤・消耗品",   amount:2300},
+  {id:10,date:"2026-06-25",type:"expense",category:"医療費",sub:"",                 account:"現金",           description:"病院・薬局",     amount:3200},
+];
+
+const DEFAULT_OPENING = {"現金":50000,"銀行口座":1200000,"クレジットカード":0,"電子マネー":5000};
+
+const DEFAULT_FUNDS = [
+  {id:1,name:"eMAXIS Slim 全世界株式",cost:300000,value:342000,start:"2024-01-15",monthly:30000,memo:"NISA口座"},
+  {id:2,name:"楽天・S&P500インデックス",cost:150000,value:171000,start:"2024-06-01",monthly:20000,memo:"特定口座"},
+];
+
+// ===================== STATE =====================
+function load(key,def){try{const v=localStorage.getItem(key);return v?JSON.parse(v):def;}catch(e){return def;}}
+function save(key,val){try{localStorage.setItem(key,JSON.stringify(val));}catch(e){}}
+
+let entries      = load('kk_entries', DEFAULT_ENTRIES);
+let subMap       = load('kk_subs',    DEFAULT_SUBS);
+let openingBal   = load('kk_opening', DEFAULT_OPENING);
+let funds        = load('kk_funds',   DEFAULT_FUNDS);
+let currentMonth = load('kk_month',   new Date().toISOString().slice(0,7));
+let currentTab   = 'ledger';
+let editingId    = null;
+let subModalCat  = null;
+let editingFundId= null;
+
+const fmt  = n => Math.abs(n).toLocaleString('ja-JP');
+const fmts = n => (n<0?'−':'')+'¥'+fmt(n);
+
+// ===================== MONTH NAV =====================
+function changeMonth(dir){
+  const[y,m]=currentMonth.split('-').map(Number);
+  const d=new Date(y,m-1+dir,1);
+  currentMonth=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+  save('kk_month',currentMonth);render();
+}
+
+// ===================== TAB =====================
+function switchTab(btn){
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');currentTab=btn.dataset.tab;render();
+}
+
+// ===================== DERIVED =====================
+function getFiltered(){return entries.filter(e=>e.date.startsWith(currentMonth)).sort((a,b)=>a.date.localeCompare(b.date));}
+
+// 口座残高計算（全期間）
+function calcAccountBalances(){
+  const bal={};
+  ACCOUNTS.forEach(a=>bal[a]=openingBal[a]||0);
+  entries.forEach(e=>{
+    if(!bal[e.account]&&bal[e.account]!==0)bal[e.account]=0;
+    if(e.type==='income')  bal[e.account]+=e.amount;
+    else                   bal[e.account]-=e.amount;
+  });
+  return bal;
+}
+
+// 月次残高推移（直近6ヶ月）
+function calcMonthlyBalances(){
+  const result=[];
+  const[cy,cm]=currentMonth.split('-').map(Number);
+  for(let i=5;i>=0;i--){
+    const d=new Date(cy,cm-1-i,1);
+    const ym=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    const inc=entries.filter(e=>e.date.startsWith(ym)&&e.type==='income').reduce((s,e)=>s+e.amount,0);
+    const exp=entries.filter(e=>e.date.startsWith(ym)&&e.type==='expense').reduce((s,e)=>s+e.amount,0);
+    result.push({ym,label:`${d.getMonth()+1}月`,inc,exp,net:inc-exp});
+  }
+  return result;
+}
+
+// ===================== RENDER =====================
+function render(){
+  const[yr,mo]=currentMonth.split('-');
+  document.getElementById('month-label').textContent=`${yr}年 ${MONTHS[Number(mo)-1]}`;
+  const filtered=getFiltered();
+  const totalIncome =filtered.filter(e=>e.type==='income').reduce((s,e)=>s+e.amount,0);
+  const totalExpense=filtered.filter(e=>e.type==='expense').reduce((s,e)=>s+e.amount,0);
+  const balance=totalIncome-totalExpense;
+  document.getElementById('s-income').textContent='¥'+fmt(totalIncome);
+  document.getElementById('s-expense').textContent='¥'+fmt(totalExpense);
+  const bEl=document.getElementById('s-balance');
+  bEl.textContent=(balance>=0?'+':'−')+'¥'+fmt(balance);
+  bEl.className='s-value '+(balance>=0?'amt-income':'amt-expense');
+  const main=document.getElementById('main');
+  if(currentTab==='ledger')   main.innerHTML=renderLedger(filtered);
+  if(currentTab==='summary')  main.innerHTML=renderSummary(filtered,totalIncome,totalExpense);
+  if(currentTab==='graph')    main.innerHTML=renderGraph(filtered,totalIncome,totalExpense,balance);
+  if(currentTab==='trial')    main.innerHTML=renderTrial();
+  if(currentTab==='invest')   main.innerHTML=renderInvest();
+  if(currentTab==='settings') main.innerHTML=renderSettings();
+}
+
+// ---- LEDGER ----
+function renderLedger(filtered){
+  if(!filtered.length)return'<div class="empty">この月の仕訳がありません</div>';
+  const rows=filtered.map(e=>{
+    const subHtml=e.sub?` <span class="sub-label">› ${esc(e.sub)}</span>`:'';
+    return`<tr>
+      <td style="white-space:nowrap;color:#555">${e.date.slice(5).replace('-','/')}</td>
+      <td><span class="badge badge-${e.type}">${e.type==='income'?'収入':'支出'}</span></td>
+      <td><b>${esc(e.category)}</b>${subHtml}</td>
+      <td style="color:#555;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(e.description)}</td>
+      <td class="col-account" style="text-align:right;color:#666;font-size:11px">${esc(e.account)}</td>
+      <td style="text-align:right" class="${e.type==='income'?'amt-income':'amt-expense'}">${e.type==='income'?'+':'−'}¥${fmt(e.amount)}</td>
+      <td style="text-align:right;white-space:nowrap">
+        <button class="btn-edit" onclick="openEditModal(${e.id})">編集</button>
+        <button class="btn-del"  onclick="deleteEntry(${e.id})">削除</button>
+      </td></tr>`;
+  }).join('');
+  return`<div class="table-wrap"><table>
+    <thead><tr><th>日付</th><th>種別</th><th>勘定科目 › 補助科目</th><th>摘要</th>
+    <th class="col-account" style="text-align:right">口座</th>
+    <th style="text-align:right">金額</th><th></th></tr></thead>
+    <tbody>${rows}</tbody></table></div>`;
+}
+
+// ---- SUMMARY ----
+function renderSummary(filtered,totalIncome,totalExpense){
+  const build=(type)=>{
+    const total=type==='income'?totalIncome:totalExpense;
+    const color=type==='income'?'#1a7a4c':'#b93030';
+    const hBg=type==='income'?'#f0faf4':'#fdf0f0';
+    const hBd=type==='income'?'#c8e6d2':'#e8c4c4';
+    const label=type==='income'?'収入明細':'支出明細';
+    let rows='';
+    CATEGORIES[type].forEach(cat=>{
+      const ce=filtered.filter(e=>e.type===type&&e.category===cat);
+      const ct=ce.reduce((s,e)=>s+e.amount,0);if(!ct)return;
+      const st={};ce.forEach(e=>{const k=e.sub||'（補助科目なし）';st[k]=(st[k]||0)+e.amount;});
+      const subs=Object.entries(st);
+      const hasMulti=subs.length>1||(subs.length===1&&subs[0][0]!=='（補助科目なし）');
+      rows+=`<div class="summary-row cat-row"><span>${esc(cat)}</span><span style="color:${color}">¥${fmt(ct)}</span></div>`;
+      if(hasMulti)subs.forEach(([sub,amt])=>{
+        const sn=sub==='（補助科目なし）'?'<span style="color:#bbb">補助科目なし</span>':`<span style="color:var(--blue)">› ${esc(sub)}</span>`;
+        rows+=`<div class="summary-row sub-row">${sn}<span>¥${fmt(amt)}</span></div>`;
+      });
+    });
+    return`<div class="summary-block">
+      <div class="summary-header" style="background:${hBg};border-bottom:1px solid ${hBd};color:${color}">${label}</div>
+      ${rows}
+      <div class="summary-row total-row" style="background:${hBg};border-top:2px solid ${hBd}"><span>合計</span><span style="color:${color}">¥${fmt(total)}</span></div>
+    </div>`;
+  };
+  return`<div class="summary-grid">${build('income')}${build('expense')}</div>`;
+}
+
+// ---- GRAPH ----
+function renderGraph(filtered,totalIncome,totalExpense,balance){
+  const catMap={};
+  filtered.filter(e=>e.type==='expense').forEach(e=>{catMap[e.category]=(catMap[e.category]||0)+e.amount;});
+  const catTotals=Object.entries(catMap).sort((a,b)=>b[1]-a[1]);
+  const maxAmt=catTotals[0]?.[1]||1;
+  if(!catTotals.length)return'<div class="graph-block"><div class="empty">支出データがありません</div></div>';
+  const items=catTotals.map(([cat,amt])=>{
+    const sm={};filtered.filter(e=>e.type==='expense'&&e.category===cat).forEach(e=>{const k=e.sub||'その他';sm[k]=(sm[k]||0)+e.amount;});
+    const subs=Object.entries(sm).sort((a,b)=>b[1]-a[1]);
+    const bars=subs.map(([s,v],i)=>`<div class="graph-bar-seg" style="width:${(v/maxAmt*100).toFixed(1)}%;background:${BAR_COLORS[i%BAR_COLORS.length]};border-right:${i<subs.length-1?'1px solid rgba(255,255,255,0.5)':'none'}" title="${esc(s)}: ¥${fmt(v)}"></div>`).join('');
+    const legend=subs.length>1?`<div class="graph-legend">${subs.map(([s,v],i)=>`<span class="graph-legend-item"><span class="graph-dot" style="background:${BAR_COLORS[i%BAR_COLORS.length]}"></span>${esc(s)} ¥${fmt(v)}</span>`).join('')}</div>`:'';
+    return`<div class="graph-item">
+      <div class="graph-item-header"><b>${esc(cat)}</b><span class="amt-expense">¥${fmt(amt)} <span style="color:#999;font-weight:400;font-size:11px">(${totalExpense?Math.round(amt/totalExpense*100):0}%)</span></span></div>
+      <div class="graph-bar-bg">${bars}</div>${legend}</div>`;
+  }).join('');
+  const balFill=Math.min(100,totalExpense/(totalIncome||1)*100).toFixed(1);
+  const balColor=totalExpense>totalIncome?'#e05050':'#4A90D9';
+  return`<div class="graph-block">
+    <div class="graph-title">支出カテゴリ別</div>${items}
+    <div class="balance-box">
+      <div class="balance-header"><span>収入 <b style="color:#1a7a4c">¥${fmt(totalIncome)}</b></span><span>支出 <b style="color:#b93030">¥${fmt(totalExpense)}</b></span></div>
+      <div class="balance-bar-bg"><div class="balance-bar-fill" style="width:${balFill}%;background:${balColor}"></div></div>
+      <div class="balance-result ${balance>=0?'amt-income':'amt-expense'}">月次収支: ${balance>=0?'+':'−'}¥${fmt(balance)}</div>
+    </div></div>`;
+}
+
+// ---- TRIAL BALANCE（残高試算表）----
+function renderTrial(){
+  const accBal=calcAccountBalances();
+  const monthly=calcMonthlyBalances();
+  const totalBal=Object.values(accBal).reduce((s,v)=>s+v,0);
+  const totalOpening=Object.values(openingBal).reduce((s,v)=>s+v,0);
+  const allInc=entries.filter(e=>e.type==='income').reduce((s,e)=>s+e.amount,0);
+  const allExp=entries.filter(e=>e.type==='expense').reduce((s,e)=>s+e.amount,0);
+
+  // 口座別残高表
+  const rows=ACCOUNTS.map(a=>{
+    const op=openingBal[a]||0;
+    const inc=entries.filter(e=>e.account===a&&e.type==='income').reduce((s,e)=>s+e.amount,0);
+    const exp=entries.filter(e=>e.account===a&&e.type==='expense').reduce((s,e)=>s+e.amount,0);
+    const bal=op+inc-exp;
+    return`<div class="trial-row">
+      <div>${esc(a)}</div>
+      <div style="color:#555">¥${fmt(op)}</div>
+      <div>${inc?`<span class="amt-income">+¥${fmt(inc)}</span>`:'-'}</div>
+      <div class="${bal>=0?'amt-income':'amt-expense'}">¥${fmt(bal)}</div>
+    </div>`;
+  }).join('');
+
+  // 月次推移グラフ
+  const maxNet=Math.max(...monthly.map(m=>Math.abs(m.net)),1);
+  const barH=100;
+  const trendBars=monthly.map(m=>{
+    const h=Math.round(Math.abs(m.net)/maxNet*barH);
+    const color=m.net>=0?'#4A90D9':'#e05050';
+    const valStr=(m.net>=0?'+':'−')+'¥'+fmt(m.net);
+    return`<div class="trend-bar-wrap">
+      <div class="trend-val" style="color:${color};font-size:8px">${valStr}</div>
+      <div style="flex:1;display:flex;align-items:flex-end;width:100%">
+        <div class="trend-bar" style="background:${color};height:${h}px;width:100%"></div>
+      </div>
+      <div class="trend-label">${m.label}</div>
+    </div>`;
+  }).join('');
+
+  return`
+    <div class="trial-block">
+      <div class="trial-header">
+        <span>口座別残高試算表</span>
+        <button class="btn-add-sub" onclick="openOpeningModal()">期首残高を設定</button>
+      </div>
+      <div class="trial-row head">
+        <div>口座</div><div>期首残高</div><div>入出金</div><div>現在残高</div>
+      </div>
+      ${rows}
+      <div class="trial-row total-row">
+        <div>合計</div>
+        <div>¥${fmt(totalOpening)}</div>
+        <div style="color:#555">収支 ${allInc-allExp>=0?'+':'−'}¥${fmt(allInc-allExp)}</div>
+        <div class="${totalBal>=0?'amt-income':'amt-expense'}">¥${fmt(totalBal)}</div>
+      </div>
+    </div>
+    <div class="trend-chart">
+      <div class="graph-title">月次収支推移（直近6ヶ月）</div>
+      <div class="trend-bars">${trendBars}</div>
+    </div>`;
+}
+
+// ---- INVEST（投資信託）----
+function renderInvest(){
+  const totalCost=funds.reduce((s,f)=>s+f.cost,0);
+  const totalVal =funds.reduce((s,f)=>s+f.value,0);
+  const totalPnl =totalVal-totalCost;
+  const totalPct =totalCost?((totalVal/totalCost-1)*100).toFixed(1):0;
+
+  const kpis=`<div class="invest-summary">
+    <div class="invest-kpi"><div class="k-label">投資総額</div><div class="k-val amt-neutral">¥${fmt(totalCost)}</div></div>
+    <div class="invest-kpi"><div class="k-label">評価総額</div><div class="k-val">¥${fmt(totalVal)}</div></div>
+    <div class="invest-kpi"><div class="k-label">損益</div><div class="k-val ${totalPnl>=0?'amt-income':'amt-expense'}">${totalPnl>=0?'+':'−'}¥${fmt(totalPnl)}</div></div>
+    <div class="invest-kpi"><div class="k-label">収益率</div><div class="k-val ${totalPnl>=0?'amt-income':'amt-expense'}">${totalPnl>=0?'+':''}${totalPct}%</div></div>
+  </div>`;
+
+  const cards=funds.map(f=>{
+    const pnl=f.value-f.cost;
+    const pct=f.cost?((f.value/f.cost-1)*100).toFixed(1):0;
+    const fillW=Math.min(100,(f.value/(f.cost||1))*50).toFixed(1);
+    const barColor=pnl>=0?'#4A90D9':'#e05050';
+    const startYM=f.start?f.start.slice(0,7):'';
+    const months=startYM?(()=>{const[sy,sm]=startYM.split('-').map(Number);const[cy2,cm2]=new Date().toISOString().slice(0,7).split('-').map(Number);return(cy2-sy)*12+(cm2-sm)+1;})():'-';
+    return`<div class="fund-card">
+      <div class="fund-name">
+        <span>${esc(f.name)}</span>
+        <span>
+          <button class="btn-edit" onclick="openEditFund(${f.id})">編集</button>
+          <button class="btn-del"  onclick="deleteFund(${f.id})">削除</button>
+        </span>
+      </div>
+      <div class="fund-grid">
+        <div class="fund-cell"><div class="fc-label">購入額</div><div class="fc-val">¥${fmt(f.cost)}</div></div>
+        <div class="fund-cell"><div class="fc-label">評価額</div><div class="fc-val">¥${fmt(f.value)}</div></div>
+        <div class="fund-cell"><div class="fc-label">損益</div><div class="fc-val ${pnl>=0?'amt-income':'amt-expense'}">${pnl>=0?'+':'−'}¥${fmt(pnl)}<span style="font-size:10px;margin-left:3px">(${pnl>=0?'+':''}${pct}%)</span></div></div>
+        ${f.monthly?`<div class="fund-cell"><div class="fc-label">月次積立</div><div class="fc-val">¥${fmt(f.monthly)}</div></div>`:''}
+        ${f.start?`<div class="fund-cell"><div class="fc-label">積立期間</div><div class="fc-val">${months}ヶ月</div></div>`:''}
+        ${f.memo?`<div class="fund-cell"><div class="fc-label">メモ</div><div class="fc-val" style="color:#666">${esc(f.memo)}</div></div>`:''}
+      </div>
+      <div class="fund-bar-wrap">
+        <div class="fund-bar-bg"><div class="fund-bar-fill" style="width:${fillW}%;background:${barColor}"></div></div>
+      </div>
+    </div>`;
+  }).join('');
+
+  return`<div class="invest-block">
+    <div class="invest-header">
+      <span>投資信託ポートフォリオ</span>
+      <button class="btn-add-sub" onclick="openAddFund()">＋ ファンド追加</button>
+    </div>
+    ${kpis}
+    ${funds.length?cards:'<div class="empty">ファンドがありません。追加してください</div>'}
+  </div>`;
+}
+
+// ---- SETTINGS ----
+function renderSettings(){
+  const types=[
+    {type:'income', label:'▶ 収入科目',bg:'#f0faf4',color:'#1a7a4c'},
+    {type:'expense',label:'▶ 支出科目',bg:'#fdf0f0',color:'#b93030'},
+  ];
+  const html=types.map(({type,label,bg,color})=>{
+    const rows=CATEGORIES[type].map(cat=>{
+      const subs=subMap[cat]||[];
+      const tags=subs.map(s=>`<span class="sub-tag">${esc(s)}<button onclick="quickDeleteSub('${esc(cat)}','${esc(s)}')">×</button></span>`).join('');
+      return`<div class="settings-cat-row">
+        <div class="settings-cat-name">${esc(cat)}</div>
+        <div class="settings-tags">${tags}${subs.length===0?'<span class="no-sub">補助科目なし</span>':''}</div>
+        <button class="btn-add-sub" onclick="openSubModal('${esc(cat)}')">＋ 追加</button>
+      </div>`;
+    }).join('');
+    return`<div class="settings-type-header" style="background:${bg};color:${color}">${label}</div>${rows}`;
+  }).join('');
+  return`<div class="settings-block">
+    <div class="settings-header">補助科目マスタ設定 <span style="font-weight:400;font-size:11px;color:#888;margin-left:6px">自由に追加・削除できます</span></div>
+    ${html}</div>`;
+}
+
+// ===================== ENTRY MODAL =====================
+function openEntryModal(id=null){
+  editingId=id;
+  document.getElementById('entry-modal-title').textContent=id?'仕訳を編集':'仕訳を入力';
+  const e=id?entries.find(x=>x.id===id):null;
+  const today=new Date().toISOString().slice(0,10);
+  document.getElementById('f-date').value    =e?.date||today;
+  document.getElementById('f-type').value    =e?.type||'expense';
+  document.getElementById('f-account').value =e?.account||'現金';
+  document.getElementById('f-desc').value    =e?.description||'';
+  document.getElementById('f-amount').value  =e?.amount||'';
+  populateCategorySelect(e?.type||'expense',e?.category);
+  populateSubSelect(e?.category||(CATEGORIES[e?.type||'expense'][0]),e?.sub);
+  document.getElementById('entry-modal').style.display='flex';
+}
+function openEditModal(id){openEntryModal(id);}
+function closeEntryModal(){document.getElementById('entry-modal').style.display='none';}
+function populateCategorySelect(type,sel){
+  document.getElementById('f-category').innerHTML=CATEGORIES[type].map(c=>`<option${c===sel?' selected':''}>${esc(c)}</option>`).join('');
+}
+function populateSubSelect(cat,sel){
+  const subs=subMap[cat]||[];
+  document.getElementById('f-sub').innerHTML=`<option value="">— 選択しない —</option>`+subs.map(s=>`<option${s===sel?' selected':''}>${esc(s)}</option>`).join('');
+  document.getElementById('f-sub-hint').style.display=subs.length===0?'block':'none';
+}
+function onTypeChange(){const t=document.getElementById('f-type').value;populateCategorySelect(t,null);populateSubSelect(CATEGORIES[t][0],null);}
+function onCategoryChange(){populateSubSelect(document.getElementById('f-category').value,null);}
+function saveEntry(){
+  const amount=Number(document.getElementById('f-amount').value);
+  if(!amount||isNaN(amount)){alert('金額を入力してください');return;}
+  const entry={id:editingId||Date.now(),date:document.getElementById('f-date').value,type:document.getElementById('f-type').value,category:document.getElementById('f-category').value,sub:document.getElementById('f-sub').value,account:document.getElementById('f-account').value,description:document.getElementById('f-desc').value,amount};
+  if(editingId)entries=entries.map(e=>e.id===editingId?entry:e);else entries.push(entry);
+  save('kk_entries',entries);closeEntryModal();render();
+}
+function deleteEntry(id){if(!confirm('この仕訳を削除しますか？'))return;entries=entries.filter(e=>e.id!==id);save('kk_entries',entries);render();}
+
+// ===================== SUB MODAL =====================
+function openSubModal(cat){
+  subModalCat=cat;
+  document.getElementById('sub-modal-title').textContent=`「${cat}」の補助科目`;
+  document.getElementById('new-sub-input').value='';
+  renderSubList();
+  document.getElementById('sub-modal').style.display='flex';
+}
+function closeSubModal(){document.getElementById('sub-modal').style.display='none';render();}
+function renderSubList(){
+  const subs=subMap[subModalCat]||[];
+  document.getElementById('sub-list').innerHTML=subs.length?subs.map(s=>`<div class="sub-list-item"><span>${esc(s)}</span><button onclick="removeSub('${esc(s)}')">×</button></div>`).join(''):'<div style="color:#bbb;font-size:13px">まだ補助科目がありません</div>';
+}
+function addSub(){const name=document.getElementById('new-sub-input').value.trim();if(!name||(subMap[subModalCat]||[]).includes(name))return;subMap[subModalCat]=[...(subMap[subModalCat]||[]),name];save('kk_subs',subMap);document.getElementById('new-sub-input').value='';renderSubList();}
+function removeSub(sub){subMap[subModalCat]=(subMap[subModalCat]||[]).filter(s=>s!==sub);save('kk_subs',subMap);renderSubList();}
+function quickDeleteSub(cat,sub){subMap[cat]=(subMap[cat]||[]).filter(s=>s!==sub);save('kk_subs',subMap);render();}
+
+// ===================== OPENING BALANCE MODAL =====================
+function openOpeningModal(){
+  const fields=document.getElementById('opening-fields');
+  fields.innerHTML=ACCOUNTS.map(a=>`
+    <div class="field"><label>${esc(a)}</label>
+      <input type="number" id="op-${a}" value="${openingBal[a]||0}" min="0" inputmode="numeric">
+    </div>`).join('');
+  document.getElementById('opening-modal').style.display='flex';
+}
+function closeOpeningModal(){document.getElementById('opening-modal').style.display='none';}
+function saveOpeningBalances(){
+  ACCOUNTS.forEach(a=>{openingBal[a]=Number(document.getElementById(`op-${a}`).value)||0;});
+  save('kk_opening',openingBal);closeOpeningModal();render();
+}
+
+// ===================== FUND MODAL =====================
+function openAddFund(){
+  editingFundId=null;
+  document.getElementById('fund-modal-title').textContent='ファンドを追加';
+  ['ff-name','ff-memo'].forEach(id=>document.getElementById(id).value='');
+  ['ff-cost','ff-value','ff-monthly'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('ff-start').value=new Date().toISOString().slice(0,10);
+  document.getElementById('fund-modal').style.display='flex';
+}
+function openEditFund(id){
+  editingFundId=id;
+  const f=funds.find(x=>x.id===id);if(!f)return;
+  document.getElementById('fund-modal-title').textContent='ファンドを編集';
+  document.getElementById('ff-name').value   =f.name||'';
+  document.getElementById('ff-cost').value   =f.cost||'';
+  document.getElementById('ff-value').value  =f.value||'';
+  document.getElementById('ff-start').value  =f.start||'';
+  document.getElementById('ff-monthly').value=f.monthly||'';
+  document.getElementById('ff-memo').value   =f.memo||'';
+  document.getElementById('fund-modal').style.display='flex';
+}
+function closeFundModal(){document.getElementById('fund-modal').style.display='none';}
+function saveFund(){
+  const name=document.getElementById('ff-name').value.trim();
+  if(!name){alert('ファンド名を入力してください');return;}
+  const fund={
+    id:editingFundId||Date.now(),name,
+    cost:Number(document.getElementById('ff-cost').value)||0,
+    value:Number(document.getElementById('ff-value').value)||0,
+    start:document.getElementById('ff-start').value,
+    monthly:Number(document.getElementById('ff-monthly').value)||0,
+    memo:document.getElementById('ff-memo').value.trim(),
+  };
+  if(editingFundId)funds=funds.map(f=>f.id===editingFundId?fund:f);else funds.push(fund);
+  save('kk_funds',funds);closeFundModal();render();
+}
+function deleteFund(id){if(!confirm('このファンドを削除しますか？'))return;funds=funds.filter(f=>f.id!==id);save('kk_funds',funds);render();}
+
+// ===================== UTILS =====================
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
+
+// overlay click to close
+['entry-modal','sub-modal','opening-modal','fund-modal'].forEach(id=>{
+  document.getElementById(id).addEventListener('click',function(e){if(e.target===this)this.style.display='none';});
+});
+
+render();
+
+if('serviceWorker' in navigator){
+  const sw=`const C='kakeibo-v2';self.addEventListener('install',e=>{e.waitUntil(caches.open(C).then(c=>c.addAll(['./'])));self.skipWaiting();});self.addEventListener('fetch',e=>{e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request).catch(()=>caches.match('./'))));});`;
+  navigator.serviceWorker.register(URL.createObjectURL(new Blob([sw],{type:'application/javascript'}))).catch(()=>{});
+}
+</script>
+</body>
+</html>
